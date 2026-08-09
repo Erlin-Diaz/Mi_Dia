@@ -711,7 +711,24 @@ function paint() {
            if (e.target.closest(".task__star")) { task.priority = !task.priority; commit(); }
 else if (e.target.closest(".task__edit")) {
   var newText = prompt("Editar tarea:", task.text);
-  if (newText !== null && newText.trim()) { task.text = newText.trim().slice(0, 140); commit(); }
+  if (newText === null) return; // canceló: no se toca nada
+  if (newText.trim()) task.text = newText.trim().slice(0, 140);
+
+  var newTime = prompt("Editar hora (HH:MM, o déjalo vacío para quitarla):", task.time || "");
+  if (newTime !== null) {
+    var trimmedTime = newTime.trim();
+    if (!trimmedTime) {
+      task.time = "";
+    } else {
+      var mins = parseTimeToMinutes(trimmedTime);
+      if (mins === null) {
+        alert("Hora no válida. Se mantiene la hora anterior.");
+      } else {
+        task.time = String(Math.floor(mins / 60)).padStart(2, "0") + ":" + String(mins % 60).padStart(2, "0");
+      }
+    }
+  }
+  commit();
 }
 else if (e.target.closest(".task__del")) { state.tasks = state.tasks.filter(function (t) { return t.id !== id; }); commit(); }
 else { task.done = e.target.classList.contains("task__box") ? e.target.checked : !task.done; commit(); }
