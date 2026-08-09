@@ -506,7 +506,7 @@
             <form class="add-row" id="addForm">
                 <input type="text" id="taskInput" placeholder="Añade algo para hoy…" autocomplete="off"
                     maxlength="140" />
-                <input type="text" id="timeInput" placeholder="hora" autocomplete="off" maxlength="12" />
+                <input type="time" id="timeInput" autocomplete="off" />
                 <button type="submit">Añadir</button>
             </form>
             <ul class="task-list" id="taskList"></ul>
@@ -585,18 +585,40 @@
             try { localStorage.setItem(localStorageKey, JSON.stringify(state)); } catch (e) { }
         }
 
-        function escapeHtml(str) {
-            var div = document.createElement("div");
-            div.textContent = str;
-            return div.innerHTML;
-        }
+       function escapeHtml(str) {
+  var div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
 
-        function paint() {
-            var pending = state.tasks.filter(function (t) { return !t.done; })
-                .sort(function (a, b) { return (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || a.order - b.order; });
-            var done = state.tasks.filter(function (t) { return t.done; })
-                .sort(function (a, b) { return a.order - b.order; });
-            var ordered = pending.concat(done);
+// Convierte "14:30", "2:30pm", "9am", etc. a minutos desde medianoche.
+// Devuelve null si el texto no se pudo interpretar como hora (o está vacío).
+function parseTimeToMinutes(str) {
+  if (!str) return null;
+  var s = str.trim().toLowerCase().replace(/\./g, "");
+  var m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if (!m) return null;
+  var h = parseInt(m[1], 10);
+  var min = m[2] ? parseInt(m[2], 10) : 0;
+  var ap = m[3];
+  if (ap === "pm" && h < 12) h += 12;
+  if (ap === "am" && h === 12) h = 0;
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+function byTimeThenOrder(a, b) {
+  var ta = parseTimeToMinutes(a.time), tb = parseTimeToMinutes(b.time);
+  if (ta === null && tb === null) return a.order - b.order;
+  if (ta === null) return 1;
+  if (tb === null) return -1;
+  return ta - tb || a.order - b.order;
+}
+
+function paint() {
+  var pending = state.tasks.filter(function (t) { return !t.done; }).sort(byTimeThenOrder);
+  var done = state.tasks.filter(function (t) { return t.done; }).sort(byTimeThenOrder);
+  var ordered = pending.concat(done);
 
             taskList.innerHTML = ordered.map(function (t) {
                 return '<li class="task' + (t.done ? " task--done" : "") + (t.priority ? " task--priority" : "") + '" data-id="' + t.id + '">' +
