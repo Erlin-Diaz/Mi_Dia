@@ -360,6 +360,31 @@
             color: var(--ink-faint);
         }
 
+        .task--overdue .task__time {
+            color: var(--urgent);
+            font-weight: 700;
+        }
+
+        .task-divider {
+            list-style: none;
+            display: block;
+            margin: 14px 0 4px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--line);
+            font-size: 0.72rem;
+            letter-spacing: 0.11em;
+            text-transform: uppercase;
+            color: var(--urgent);
+            font-weight: 600;
+            font-family: ui-monospace, monospace;
+        }
+
+        .task-list li.task-divider:first-child {
+            border-top: none;
+            padding-top: 0;
+            margin-top: 0;
+        }
+
         .task__actions {
             display: flex;
             flex-shrink: 0;
@@ -615,22 +640,41 @@ function byTimeThenOrder(a, b) {
   return ta - tb || a.order - b.order;
 }
 
-function paint() {
-  var pending = state.tasks.filter(function (t) { return !t.done; }).sort(byTimeThenOrder);
-  var done = state.tasks.filter(function (t) { return t.done; }).sort(byTimeThenOrder);
-  var ordered = pending.concat(done);
+// Una tarea está "vencida" si tiene hora, esa hora ya pasó y no está hecha.
+function isOverdue(t, nowMinutes) {
+  if (t.done) return false;
+  var tm = parseTimeToMinutes(t.time);
+  return tm !== null && tm < nowMinutes;
+}
 
-            taskList.innerHTML = ordered.map(function (t) {
-                return '<li class="task' + (t.done ? " task--done" : "") + (t.priority ? " task--priority" : "") + '" data-id="' + t.id + '">' +
-                    '<label class="task__box-wrap"><input type="checkbox" class="task__box" ' + (t.done ? "checked" : "") + ' aria-label="Marcar como hecho" /></label>' +
-                    '<span class="task__text">' + escapeHtml(t.text) + '</span>' +
-                    (t.time ? '<span class="task__time">' + escapeHtml(t.time) + '</span>' : "") +
-                    '<span class="task__actions">' +
+function taskHtml(t, overdue) {
+    return '<li class="task' + (t.done ? " task--done" : "") + (t.priority ? " task--priority" : "") + (overdue ? " task--overdue" : "") + '" data-id="' + t.id + '">' +
+        '<label class="task__box-wrap"><input type="checkbox" class="task__box" ' + (t.done ? "checked" : "") + ' aria-label="Marcar como hecho" /></label>' +
+        '<span class="task__text">' + escapeHtml(t.text) + '</span>' +
+        (t.time ? '<span class="task__time">' + escapeHtml(t.time) + '</span>' : "") +
+        '<span class="task__actions">' +
 '<button type="button" class="task__star" aria-pressed="' + (t.priority ? "true" : "false") + '" aria-label="Destacar tarea" title="Destacar">&#9679;</button>' +
 '<button type="button" class="task__edit" aria-label="Editar tarea" title="Editar">&#9998;</button>' +
 '<button type="button" class="task__del" aria-label="Eliminar tarea" title="Eliminar">&times;</button>' +
 '</span></li>';
-            }).join("");
+}
+
+function paint() {
+  var now = new Date();
+  var nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  var pendingAll = state.tasks.filter(function (t) { return !t.done; });
+  var overdue = pendingAll.filter(function (t) { return isOverdue(t, nowMinutes); }).sort(byTimeThenOrder);
+  var upcoming = pendingAll.filter(function (t) { return !isOverdue(t, nowMinutes); }).sort(byTimeThenOrder);
+  var done = state.tasks.filter(function (t) { return t.done; }).sort(byTimeThenOrder);
+
+  var html = upcoming.map(function (t) { return taskHtml(t, false); }).join("");
+  if (overdue.length) {
+    html += '<li class="task-divider">Tareas sin realizar</li>' + overdue.map(function (t) { return taskHtml(t, true); }).join("");
+  }
+  html += done.map(function (t) { return taskHtml(t, false); }).join("");
+
+  taskList.innerHTML = html;
 
             var total = state.tasks.length;
             var doneCount = done.length;
@@ -844,6 +888,10 @@ else { task.done = e.target.classList.contains("task__box") ? e.target.checked :
         }
 
         paint();
+
+        // Revisa cada minuto si alguna tarea pendiente ya venció su hora,
+        // para moverla automáticamente a "Tareas sin realizar" sin recargar.
+        setInterval(render, 60000);
     </script>
 
 </body>
