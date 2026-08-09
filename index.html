@@ -8,15 +8,15 @@
     <style>
         :root {
             color-scheme: light dark;
-            --bg: light-dark(#ECEDF2, #14151C);
-            --surface: light-dark(#FFFFFF, #1B1D26);
-            --ink: light-dark(#1C1E2A, #E8E9EF);
-            --ink-soft: light-dark(#5B5E70, #9699AC);
-            --ink-faint: light-dark(#9498A8, #565A6E);
-            --line: light-dark(#DCDDE5, #292B38);
-            --accent: light-dark(#A8752A, #E7B65C);
-            --urgent: light-dark(#B23B33, #E2897E);
-            --ok: light-dark(#3B7D4F, #7FCB94);
+            --bg: light-dark(#F6F6F3, #17171A);
+--surface: light-dark(#FFFFFF, #1E1E22);
+--ink: light-dark(#1B1B1F, #F2F2ED);
+--ink-soft: light-dark(#6E6E74, #9A9AA0);
+--ink-faint: light-dark(#ACACB1, #5C5C62);
+--line: light-dark(#E3E3DF, #303034);
+--accent: light-dark(#A13D2E, #C1543F);
+--urgent: light-dark(#A13D2E, #C1543F);
+--ok: light-dark(#6E6E74, #9A9AA0);
             --radius: 4px;
         }
 
@@ -28,6 +28,11 @@
             -webkit-text-size-adjust: 100%;
             text-size-adjust: 100%;
         }
+
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.18s; }
+}
 
         body {
             margin: 0;
@@ -43,15 +48,31 @@
             overflow-x: hidden;
         }
 
-        .page {
-            width: 100%;
-            max-width: 560px;
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 14px 34px -20px rgb(0 0 0 / 0.35);
-            padding: 44px 40px 36px;
-        }
+       .page {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 14px 34px -20px rgb(0 0 0 / 0.35);
+  padding: 30px 40px 36px;
+  animation: rise 0.5s ease-out;
+}
+@media (prefers-reduced-motion: reduce) { .page { animation: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+/* Today's page, torn from the pad: a perforated edge instead of a rounded top. */
+.page::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: 0; right: 0;
+  height: 15px;
+  background-image: radial-gradient(circle at 9px 8px, var(--bg) 7.5px, transparent 8px);
+  background-size: 18px 16px;
+  background-repeat: repeat-x;
+  background-position: 6px 0;
+}
 
         header {
             display: flex;
@@ -79,8 +100,9 @@
             font-weight: 800;
             font-size: clamp(1.9rem, 6.4vw, 2.5rem);
             line-height: 1.05;
-            letter-spacing: -0.01em;
+            letter-spacing: -0.03em;
             text-wrap: balance;
+            font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
         }
 
         .day-name {
@@ -127,7 +149,7 @@
         .sync-row {
             margin-top: 18px;
             padding: 10px 12px;
-            border: 1px dashed var(--line);
+            border: 1px dotted var(--line);
             border-radius: var(--radius);
             display: flex;
             align-items: center;
@@ -535,6 +557,7 @@
         var dateKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
         var localStorageKey = "planner-" + dateKey;
 
+        var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         var hour = now.getHours();
         document.getElementById("greeting").textContent = hour < 12 ? "Buenos días" : hour < 20 ? "Buenas tardes" : "Buenas noches";
         document.getElementById("dateHeading").textContent = now.toLocaleDateString("es-ES", { day: "numeric", month: "long" });
@@ -614,6 +637,14 @@ function paint() {
             dial.style.setProperty("--pct", total ? Math.round((doneCount / total) * 100) : 0);
             progressCount.textContent = doneCount + "/" + total;
         }
+
+        function render() {
+  if (!reduceMotion && document.startViewTransition) {
+    document.startViewTransition(paint);
+  } else {
+    paint();
+  }
+}
 
         document.getElementById("addForm").addEventListener("submit", function (e) {
             e.preventDefault();
@@ -775,7 +806,7 @@ else { task.done = e.target.classList.contains("task__box") ? e.target.checked :
                         state = { tasks: remote.tasks || [], notes: remote.notes || "" };
                         notesArea.value = state.notes;
                         saveLocal();
-                        paint();
+                        render();
                         applyingRemote = false;
                     } else {
                         // No hay nada remoto todavía: sube lo que tengas en local.
@@ -801,7 +832,7 @@ else { task.done = e.target.classList.contains("task__box") ? e.target.checked :
         }
         function commit() {
             saveLocal();
-            paint();
+            render();
             if (applyingRemote) return;
             pushRemote();
         }
