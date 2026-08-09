@@ -344,35 +344,12 @@
             margin-right: -8px;
         }
 
-        .task__star,
-        .task__del {
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: 0.95rem;
-            line-height: 1;
-            padding: 8px;
-            color: var(--ink-faint);
-            opacity: 0.55;
-        }
-
-        .task:hover .task__star,
-        .task:hover .task__del {
-            opacity: 1;
-        }
-
-        .task__star:hover {
-            color: var(--urgent);
-        }
-
-        .task__star[aria-pressed="true"] {
-            color: var(--urgent);
-            opacity: 1;
-        }
-
-        .task__del:hover {
-            color: var(--ink);
-        }
+        .task__star, .task__edit, .task__del { border: none; background: none; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 8px; color: var(--ink-faint); opacity: 0.55; }
+.task:hover .task__star, .task:hover .task__edit, .task:hover .task__del { opacity: 1; }
+.task__star:hover { color: var(--urgent); }
+.task__star[aria-pressed="true"] { color: var(--urgent); opacity: 1; }
+.task__edit:hover { color: var(--accent); }
+.task__del:hover { color: var(--ink); }
 
         .empty-state {
             display: none;
@@ -626,9 +603,10 @@ function paint() {
                     '<span class="task__text">' + escapeHtml(t.text) + '</span>' +
                     (t.time ? '<span class="task__time">' + escapeHtml(t.time) + '</span>' : "") +
                     '<span class="task__actions">' +
-                    '<button type="button" class="task__star" aria-pressed="' + (t.priority ? "true" : "false") + '" aria-label="Destacar tarea" title="Destacar">&#9679;</button>' +
-                    '<button type="button" class="task__del" aria-label="Eliminar tarea" title="Eliminar">&times;</button>' +
-                    '</span></li>';
+'<button type="button" class="task__star" aria-pressed="' + (t.priority ? "true" : "false") + '" aria-label="Destacar tarea" title="Destacar">&#9679;</button>' +
+'<button type="button" class="task__edit" aria-label="Editar tarea" title="Editar">&#9998;</button>' +
+'<button type="button" class="task__del" aria-label="Eliminar tarea" title="Eliminar">&times;</button>' +
+'</span></li>';
             }).join("");
 
             var total = state.tasks.length;
@@ -655,9 +633,13 @@ function paint() {
             var id = li.getAttribute("data-id");
             var task = state.tasks.find(function (t) { return t.id === id; });
             if (!task) return;
-            if (e.target.closest(".task__star")) { task.priority = !task.priority; commit(); }
-            else if (e.target.closest(".task__del")) { state.tasks = state.tasks.filter(function (t) { return t.id !== id; }); commit(); }
-            else { task.done = e.target.classList.contains("task__box") ? e.target.checked : !task.done; commit(); }
+           if (e.target.closest(".task__star")) { task.priority = !task.priority; commit(); }
+else if (e.target.closest(".task__edit")) {
+  var newText = prompt("Editar tarea:", task.text);
+  if (newText !== null && newText.trim()) { task.text = newText.trim().slice(0, 140); commit(); }
+}
+else if (e.target.closest(".task__del")) { state.tasks = state.tasks.filter(function (t) { return t.id !== id; }); commit(); }
+else { task.done = e.target.classList.contains("task__box") ? e.target.checked : !task.done; commit(); }
         });
 
         document.getElementById("clearDone").addEventListener("click", function () {
