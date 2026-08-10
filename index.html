@@ -636,10 +636,15 @@
         } catch (e) { }
 
         // Trae automáticamente, una sola vez por día, las tareas que quedaron
-        // sin realizar en el último día guardado antes de hoy. Se guarda una
-        // marca separada (en vez de fiarse de si hoy ya tenía datos locales)
-        // para que también funcione si la app ya se había abierto hoy antes
-        // de que existiera este traslado.
+        // sin realizar en el último día guardado antes de hoy (aunque se
+        // hayan salteado días). "carryPending" se calcula una sola vez al
+        // cargar; applyCarryOver() se puede llamar varias veces sobre
+        // distintos estados (local y luego remoto) sin duplicar, porque
+        // descarta por id los que ya estén presentes. Esto es necesario
+        // porque cuando hay sincronización, el estado remoto reemplaza por
+        // completo al local apenas llega (ver más abajo) y si solo
+        // aplicáramos el traslado una vez sobre el estado local, la
+        // sincronización lo borraría.
         var CARRY_MARK_KEY = "planner-carriedDate";
         function formatDateKey(d) {
             return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -653,32 +658,39 @@
             }
             return null;
         }
+        var carryPending = null;
         try {
             if (localStorage.getItem(CARRY_MARK_KEY) !== dateKey) {
                 var prevKey = findPreviousDayKey(30);
-                if (prevKey) {
-                    var prevState = JSON.parse(localStorage.getItem("planner-" + prevKey) || "null");
-                    var pending = prevState && Array.isArray(prevState.tasks)
-                        ? prevState.tasks.filter(function (t) { return t && !t.done; })
-                        : [];
-                    if (pending.length) {
-                        var existingIds = {};
-                        state.tasks.forEach(function (t) { existingIds[t.id] = true; });
-                        var offset = state.tasks.length;
-                        pending.forEach(function (t, i) {
-                            if (t.id && existingIds[t.id]) return;
-                            state.tasks.push({
-                                id: t.id || (Date.now() + "-" + Math.random().toString(36).slice(2, 7)),
-                                text: t.text, time: t.time || "",
-                                done: false, priority: !!t.priority, order: offset + i
-                            });
-                        });
-                    }
-                }
+                var prevState = prevKey ? JSON.parse(localStorage.getItem("planner-" + prevKey) || "null") : null;
+                carryPending = prevState && Array.isArray(prevState.tasks)
+                    ? prevState.tasks.filter(function (t) { return t && !t.done; })
+                    : [];
+                // Se marca de una vez: el traslado se intenta una sola vez
+                // por día, aunque tarde en aplicarse a un estado remoto.
                 localStorage.setItem(CARRY_MARK_KEY, dateKey);
-                saveLocal(); // persiste ya el traslado, para no repetirlo ni perderlo
             }
         } catch (e) { }
+
+        function applyCarryOver(targetState) {
+            if (!carryPending || !carryPending.length) return false;
+            var existingIds = {};
+            targetState.tasks.forEach(function (t) { existingIds[t.id] = true; });
+            var offset = targetState.tasks.length;
+            var added = false;
+            carryPending.forEach(function (t, i) {
+                if (t.id && existingIds[t.id]) return;
+                targetState.tasks.push({
+                    id: t.id || (Date.now() + "-" + Math.random().toString(36).slice(2, 7)),
+                    text: t.text, time: t.time || "",
+                    done: false, priority: !!t.priority, order: offset + i
+                });
+                added = true;
+            });
+            return added;
+        }
+
+        if (applyCarryOver(state)) saveLocal();
 
         var taskList = document.getElementById("taskList");
         var dial = document.getElementById("dial");
@@ -989,10 +1001,16 @@ else { task.done = e.target.classList.contains("task__box") ? e.target.checked :
                         var remote = snap.data();
                         applyingRemote = true;
                         state = { tasks: remote.tasks || [], notes: remote.notes || "" };
+                        // El estado remoto reemplaza por completo al local: si el
+                        // traslado de ayer todavía no se aplicó a un estado "real"
+                        // (por ejemplo, este remoto es de antes de tener esta
+                        // función), se aplica ahora para que no se pierda.
+                        var carried = applyCarryOver(state);
                         notesArea.value = state.notes;
                         saveLocal();
                         render();
                         applyingRemote = false;
+                        if (carried) pushRemote();
                     } else {
                         // No hay nada remoto todavía: sube lo que tengas en local.
                         pushRemote();
