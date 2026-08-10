@@ -15,6 +15,11 @@
     --urgent-text: light-dark(#A13D2E, #d8715a);
     --ok: light-dark(#6E6E74, #9A9AA0);
     --radius: 4px;
+    /* Alternativa gratuita a Century Gothic (licencia propietaria de
+       Monotype, no incrustable): geométrica y redondeada, mismo espíritu.
+       Se usa en toda la app, con respaldo del sistema si Google Fonts no
+       llegara a cargar. */
+    --font-display: "Poppins", ui-sans-serif, system-ui, -apple-system, Roboto, sans-serif;
 }
 
 /* Tema elegido manualmente: fuerza la resolución de light-dark(),
@@ -42,7 +47,7 @@ body {
         radial-gradient(480px 320px at 88% -8%, color-mix(in srgb, var(--accent) 16%, transparent), transparent),
         var(--bg);
     color: var(--ink);
-    font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, sans-serif;
+    font-family: var(--font-display);
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -135,7 +140,7 @@ body {
             text-transform: uppercase;
             color: var(--ink-soft);
             font-weight: 600;
-            font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+            font-family: var(--font-display);
         }
 
         .date-heading {
@@ -145,7 +150,7 @@ body {
             line-height: 1.05;
             letter-spacing: -0.03em;
             text-wrap: balance;
-            font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+            font-family: var(--font-display);
         }
 
         .day-name {
@@ -182,7 +187,7 @@ body {
         }
 
         .dial__count {
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
             font-variant-numeric: tabular-nums;
             font-size: 0.72rem;
             color: var(--ink-soft);
@@ -210,7 +215,7 @@ body {
             background: var(--bg);
             padding: 2px 6px;
             border-radius: 3px;
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
             color: var(--ink);
             letter-spacing: 0.02em;
         }
@@ -296,7 +301,7 @@ body {
         #timeInput {
             width: 78px;
             flex-shrink: 0;
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
             font-size: 0.82rem;
             color: var(--ink-soft);
             border-left: 1px solid var(--line);
@@ -405,7 +410,7 @@ body {
         .task__badge {
             display: inline-block;
             font-size: 0.66rem;
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
             letter-spacing: 0.02em;
             color: var(--ink-soft);
             background: var(--bg);
@@ -418,7 +423,7 @@ body {
 
         .task__time {
             flex-shrink: 0;
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
             font-size: 0.78rem;
             color: var(--ink-soft);
         }
@@ -452,7 +457,7 @@ body {
             text-transform: uppercase;
             color: var(--urgent-text);
             font-weight: 700;
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
         }
 
         .task-list li.task-divider:first-child {
@@ -502,7 +507,7 @@ body {
     border-bottom: 1px solid var(--line);
     background: transparent;
     color: var(--ink-soft);
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-display);
     font-size: 0.82rem;
     padding: 4px 2px;
     outline: none;
@@ -561,7 +566,7 @@ body {
             text-transform: uppercase;
             color: var(--ink-soft);
             font-weight: 600;
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
             margin-bottom: 10px;
         }
 
@@ -634,7 +639,7 @@ body {
             border: none;
             background: none;
             color: var(--ink-soft);
-            font-family: ui-monospace, monospace;
+            font-family: var(--font-display);
             font-size: 0.76rem;
             cursor: pointer;
             padding: 4px 2px;
