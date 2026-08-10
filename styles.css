@@ -78,10 +78,7 @@ body {
 
 .page__tools {
   display: flex;
-  gap: 2px;
-  /* Compensa el padding de .icon-btn para que los íconos queden
-     ópticamente alineados con el borde derecho del círculo, debajo. */
-  margin-right: -6px;
+  gap: 0px;
 }
 
 .icon-btn {
@@ -90,7 +87,7 @@ body {
   background: none;
   color: var(--ink-soft);
   cursor: pointer;
-  padding: 6px;
+  padding: 4px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -164,13 +161,13 @@ body {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 12px;
         }
 
         .dial {
             --pct: 0;
-            width: 56px;
-            height: 56px;
+            width: 62px;
+            height: 62px;
             border-radius: 50%;
             background: conic-gradient(var(--accent) calc(var(--pct) * 1%), var(--line) 0);
             position: relative;
@@ -179,7 +176,7 @@ body {
         .dial::before {
             content: "";
             position: absolute;
-            inset: 8px;
+            inset: 9px;
             border-radius: 50%;
             background: var(--surface);
         }
@@ -624,7 +621,7 @@ body {
             }
 
             .dial {
-                width: 48px;
-                height: 48px;
+                width: 54px;
+                height: 54px;
             }
         }
