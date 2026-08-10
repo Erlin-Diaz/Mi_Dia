@@ -15,13 +15,15 @@
 //   Opción B — Firebase CLI (si la tenés instalada):
 //     firebase deploy --only firestore:rules
 //
-// POR QUÉ HACE FALTA "list" ADEMÁS DE "get":
+// SOBRE "get" Y "list":
 //   El traslado automático de tareas pendientes busca el día más
-//   reciente anterior a hoy con una consulta (orderBy + limit) sobre la
-//   colección "days", no accediendo a un documento puntual por su fecha.
-//   Esa operación es "list" en Firestore, y las reglas de solo "get" no
-//   alcanzan para permitirla — si esa consulta falla con
-//   "permission-denied" en la consola del navegador, es este el motivo.
+//   reciente anterior a hoy con lecturas directas por fecha (getDoc),
+//   así que en la práctica solo necesita permiso de "get". Se deja
+//   también "list" habilitado (no hace daño con este modelo de
+//   seguridad tan abierto) por si algo a futuro necesita consultar la
+//   colección completa. Si ya aplicaste una versión anterior de este
+//   archivo con "get, list", no hace falta volver a aplicarlo: sigue
+//   siendo válida.
 
 rules_version = '2';
 
