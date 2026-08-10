@@ -645,7 +645,11 @@
         // completo al local apenas llega (ver más abajo) y si solo
         // aplicáramos el traslado una vez sobre el estado local, la
         // sincronización lo borraría.
-        var CARRY_MARK_KEY = "planner-carriedDate";
+        // "v2": versión nueva de la marca. Los intentos anteriores (antes de
+        // corregir la pérdida por sincronización remota) ya habían guardado
+        // "planner-carriedDate" para hoy sin haber trasladado nada de verdad;
+        // usar una clave distinta fuerza un reintento limpio una sola vez.
+        var CARRY_MARK_KEY = "planner-carriedDate-v2";
         function formatDateKey(d) {
             return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
         }
