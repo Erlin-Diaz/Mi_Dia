@@ -57,7 +57,7 @@ try {
     if (saved) state = JSON.parse(saved);
 } catch (e) { }
 
-// Lista "Sin fecha": tareas sin día asociado (no se resetean, no vencen).
+// Lista "Algún día": tareas sin día asociado (no se resetean, no vencen).
 var somedayState = { tasks: [] };
 try {
     var savedSomeday = localStorage.getItem(SOMEDAY_KEY);
@@ -183,13 +183,13 @@ function saveSomedayLocal() {
 
 // ---- Edición en línea (reemplaza los prompt()/alert() del navegador) ----
 var editingTaskId = null; // id en edición en la lista de hoy
-var editingSomedayId = null; // id en edición en la lista "Sin fecha"
+var editingSomedayId = null; // id en edición en la lista "Algún día"
 
 function paint() {
     var nowDate = new Date();
     var nowMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
     var groups = splitTasksForRender(state.tasks, nowMinutes);
-    var moveOpts = { moveLabel: "Mover a Sin fecha", moveIcon: "&#8658;" };
+    var moveOpts = { moveLabel: "Mover a Algún día", moveIcon: "&#8658;" };
 
     function renderTask(t, overdue) {
         return t.id === editingTaskId ? taskEditHtml(t) : taskHtml(t, overdue, moveOpts);
@@ -321,7 +321,7 @@ document.getElementById("clearDone").addEventListener("click", function () {
     commit();
 });
 
-// ---- Lista "Sin fecha" (reemplaza el cuadro de notas libres) ----
+// ---- Lista "Algún día" (reemplaza el cuadro de notas libres) ----
 document.getElementById("somedayAddForm").addEventListener("submit", function (e) {
     e.preventDefault();
     var text = somedayInput.value.trim();
@@ -466,7 +466,7 @@ function mergeState(incoming) {
 // ======================================================================
 // 2) SINCRONIZACIÓN ENTRE DISPOSITIVOS (Firebase Firestore)
 //    Todos los dispositivos que usen el MISMO "código" comparten los
-//    mismos datos del día (y la lista "Sin fecha") en tiempo real.
+//    mismos datos del día (y la lista "Algún día") en tiempo real.
 // ======================================================================
 var CODE_KEY = "tu-dia-sync-code";
 function randomCode() {
@@ -498,7 +498,7 @@ var applyingRemote = false, applyingSomedayRemote = false;
 var isConfigured = FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PEGA_AQUI") === -1;
 
 // ---- Fábrica de guardado remoto con reintento automático (backoff) ----
-// Se usa una instancia para la lista de hoy y otra para "Sin fecha", así
+// Se usa una instancia para la lista de hoy y otra para "Algún día", así
 // cada una reintenta de forma independiente si falla su guardado.
 function createRemoteSync(getRef, getPayload) {
     var retryTimer = null, retryDelay = 5000, retryCount = 0;
@@ -662,7 +662,7 @@ async function initFirebaseSync() {
                 pushSomedayRemote();
             }
         }, function (err) {
-            console.error("Firestore error (Sin fecha):", err);
+            console.error("Firestore error (Algún día):", err);
         });
     } catch (e) {
         setSyncStatus("err", "Error de configuración");

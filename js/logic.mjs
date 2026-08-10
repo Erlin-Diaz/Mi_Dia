@@ -127,7 +127,7 @@ export function isDayComplete(total, doneCount) {
 /**
  * HTML de una tarea, en modo lectura normal (no edición).
  * opts.moveLabel / opts.moveIcon: si se pasan, agrega un botón "mover"
- * (usado para pasar tareas entre la lista de hoy y la de "Sin fecha").
+ * (usado para pasar tareas entre la lista de hoy y la de "Algún día").
  */
 export function taskHtml(t, overdue, opts) {
     opts = opts || {};
@@ -166,7 +166,7 @@ export function taskEditHtml(t, opts) {
 }
 
 /**
- * Separa las tareas de la lista "Sin fecha" en pendientes y hechas,
+ * Separa las tareas de la lista "Algún día" en pendientes y hechas,
  * ordenadas por el orden en que se agregaron (no tienen hora ni pueden
  * estar "vencidas").
  */

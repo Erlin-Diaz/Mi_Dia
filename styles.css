@@ -570,7 +570,7 @@ body {
             margin-bottom: 10px;
         }
 
-        /* La lista "Sin fecha" reutiliza .add-row/.task-list/.task, pero sin
+        /* La lista "Algún día" reutiliza .add-row/.task-list/.task, pero sin
            input de hora (no aplica: estas tareas no tienen día ni hora). */
         .someday .add-row {
             border-bottom-color: var(--line);

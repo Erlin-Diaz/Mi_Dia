@@ -187,9 +187,9 @@ describe("taskHtml", function () {
     test("agrega el botón de mover solo si se pasa moveLabel", function () {
         var t = { id: "1", text: "x", done: false, priority: false };
         assert.ok(!taskHtml(t, false).includes("task__move"));
-        var html = taskHtml(t, false, { moveLabel: "Mover a Sin fecha" });
+        var html = taskHtml(t, false, { moveLabel: "Mover a Algún día" });
         assert.ok(html.includes("task__move"));
-        assert.ok(html.includes("Mover a Sin fecha"));
+        assert.ok(html.includes("Mover a Algún día"));
     });
 });
 
