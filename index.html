@@ -81,6 +81,20 @@
             <p class="empty-state" id="somedayEmptyState">Nada por acá todavía.</p>
         </details>
 
+        <details class="someday school" id="schoolSection">
+            <summary class="section-label">Tareas del cole <span class="someday__count" id="schoolCount"></span></summary>
+            <form class="add-row school-add-row" id="schoolAddForm">
+                <input type="text" id="schoolInput" placeholder="¿Qué hay que hacer?…" autocomplete="off"
+                    maxlength="140" />
+                <input type="text" id="schoolChildInput" placeholder="¿Quién? (opcional)" autocomplete="off"
+                    maxlength="40" />
+                <input type="date" id="schoolDateInput" aria-label="Fecha límite (opcional)" />
+                <button type="submit">Añadir</button>
+            </form>
+            <div id="schoolGroups"></div>
+            <p class="empty-state" id="schoolEmptyState">Nada por acá todavía.</p>
+        </details>
+
         <footer class="page__footer">
             <div class="footer__group">
                 <button class="ghost-btn" id="importBtn" type="button"

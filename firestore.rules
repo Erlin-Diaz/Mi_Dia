@@ -39,5 +39,11 @@ service cloud.firestore {
       allow get, list: if true;
       allow write: if true;
     }
+    // "Tareas del cole": ídem, un único documento por código, con las
+    // tareas de los hijos/as (agrupadas por hijo/a en la app).
+    match /planners/{code}/school/{doc} {
+      allow get, list: if true;
+      allow write: if true;
+    }
   }
 }

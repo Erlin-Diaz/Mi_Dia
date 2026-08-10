@@ -7,6 +7,7 @@ import {
     escapeHtml, parseTimeToMinutes, byTimeThenOrder, isOverdue,
     formatDateKey, findPreviousDayKey, applyCarryOver, splitTasksForRender,
     splitSomedayForRender, computeDialPct, isDayComplete, taskHtml, taskEditHtml,
+    isSchoolTaskOverdue, groupSchoolTasksByChild, schoolTaskHtml, schoolTaskEditHtml,
 } from "./logic.mjs";
 
 // ======================================================================
@@ -44,6 +45,7 @@ var now = new Date();
 var dateKey = formatDateKey(now);
 var localStorageKey = "planner-" + dateKey;
 var SOMEDAY_KEY = "planner-someday"; // no lleva fecha: no se resetea cada día
+var SCHOOL_KEY = "planner-school"; // ídem, para "Tareas del cole"
 
 var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 var hour = now.getHours();
@@ -62,6 +64,14 @@ var somedayState = { tasks: [] };
 try {
     var savedSomeday = localStorage.getItem(SOMEDAY_KEY);
     if (savedSomeday) somedayState = JSON.parse(savedSomeday);
+} catch (e) { }
+
+// Lista "Tareas del cole": tareas de los hijos/as (con hijo/a y fecha
+// límite opcionales), agrupadas por hijo/a. Tampoco se resetea cada día.
+var schoolState = { tasks: [] };
+try {
+    var savedSchool = localStorage.getItem(SCHOOL_KEY);
+    if (savedSchool) schoolState = JSON.parse(savedSchool);
 } catch (e) { }
 
 // Trae automáticamente, una sola vez por día, las tareas que quedaron
@@ -127,6 +137,13 @@ var somedayTaskList = document.getElementById("somedayTaskList");
 var somedayInput = document.getElementById("somedayInput");
 var somedaySection = document.getElementById("somedaySection");
 var somedayCount = document.getElementById("somedayCount");
+var schoolGroups = document.getElementById("schoolGroups");
+var schoolInput = document.getElementById("schoolInput");
+var schoolChildInput = document.getElementById("schoolChildInput");
+var schoolDateInput = document.getElementById("schoolDateInput");
+var schoolSection = document.getElementById("schoolSection");
+var schoolCount = document.getElementById("schoolCount");
+var schoolEmptyState = document.getElementById("schoolEmptyState");
 
 // ---- Ajustes: la fila de sincronización queda oculta hasta que se pida ----
 settingsToggle.addEventListener("click", function () {
@@ -134,11 +151,18 @@ settingsToggle.addEventListener("click", function () {
     settingsToggle.setAttribute("aria-expanded", syncRow.hidden ? "false" : "true");
 });
 
-// ---- "Algún día" desplegable: recuerda si quedó abierta o cerrada ----
+// ---- "Algún día" y "Tareas del cole" desplegables: recuerdan si
+// quedaron abiertas o cerradas ----
 var SOMEDAY_OPEN_KEY = "planner-somedayOpen";
 try { somedaySection.open = localStorage.getItem(SOMEDAY_OPEN_KEY) === "1"; } catch (e) { }
 somedaySection.addEventListener("toggle", function () {
     try { localStorage.setItem(SOMEDAY_OPEN_KEY, somedaySection.open ? "1" : "0"); } catch (e) { }
+});
+
+var SCHOOL_OPEN_KEY = "planner-schoolOpen";
+try { schoolSection.open = localStorage.getItem(SCHOOL_OPEN_KEY) === "1"; } catch (e) { }
+schoolSection.addEventListener("toggle", function () {
+    try { localStorage.setItem(SCHOOL_OPEN_KEY, schoolSection.open ? "1" : "0"); } catch (e) { }
 });
 
 // ---- Estado de sincronización (dot + texto + aviso de error) ----
@@ -200,10 +224,14 @@ function saveLocal() {
 function saveSomedayLocal() {
     try { localStorage.setItem(SOMEDAY_KEY, JSON.stringify(somedayState)); } catch (e) { }
 }
+function saveSchoolLocal() {
+    try { localStorage.setItem(SCHOOL_KEY, JSON.stringify(schoolState)); } catch (e) { }
+}
 
 // ---- Edición en línea (reemplaza los prompt()/alert() del navegador) ----
 var editingTaskId = null; // id en edición en la lista de hoy
 var editingSomedayId = null; // id en edición en la lista "Algún día"
+var editingSchoolId = null; // id en edición en "Tareas del cole"
 
 function paint() {
     var nowDate = new Date();
@@ -252,6 +280,34 @@ function paintSomeday() {
     }
 }
 
+function paintSchool() {
+    var groups = groupSchoolTasksByChild(schoolState.tasks);
+    var moveOpts = { moveLabel: "Mover a hoy", moveIcon: "&#8656;" };
+    var total = 0;
+    var pendingTotal = 0;
+
+    function renderTask(t) {
+        var overdue = isSchoolTaskOverdue(t, dateKey);
+        return t.id === editingSchoolId ? schoolTaskEditHtml(t) : schoolTaskHtml(t, overdue, moveOpts);
+    }
+
+    schoolGroups.innerHTML = groups.map(function (g) {
+        total += g.pending.length + g.done.length;
+        pendingTotal += g.pending.length;
+        var label = escapeHtml(g.child || "Sin asignar");
+        return '<h3 class="school-group-label">' + label + '</h3>' +
+            '<ul class="task-list">' + g.pending.map(renderTask).join("") + g.done.map(renderTask).join("") + '</ul>';
+    }).join("");
+
+    schoolCount.textContent = pendingTotal ? "(" + pendingTotal + ")" : "";
+    schoolEmptyState.classList.toggle("is-visible", total === 0);
+
+    if (editingSchoolId) {
+        var input = schoolGroups.querySelector(".task--editing .task-edit__text");
+        if (input) { input.focus(); input.select(); }
+    }
+}
+
 function render() {
     if (!reduceMotion && document.startViewTransition) {
         document.startViewTransition(paint);
@@ -264,6 +320,13 @@ function renderSomeday() {
         document.startViewTransition(paintSomeday);
     } else {
         paintSomeday();
+    }
+}
+function renderSchool() {
+    if (!reduceMotion && document.startViewTransition) {
+        document.startViewTransition(paintSchool);
+    } else {
+        paintSchool();
     }
 }
 
@@ -412,6 +475,79 @@ somedayTaskList.addEventListener("keydown", function (e) {
     }
 });
 
+// ---- "Tareas del cole" (tareas de los hijos/as, agrupadas por hijo/a) ----
+document.getElementById("schoolAddForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var text = schoolInput.value.trim();
+    if (!text) return;
+    schoolState.tasks.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+        text: text, child: schoolChildInput.value.trim(), dueDate: schoolDateInput.value || "",
+        done: false, priority: false, order: schoolState.tasks.length
+    });
+    schoolInput.value = ""; schoolChildInput.value = ""; schoolDateInput.value = ""; schoolInput.focus();
+    commitSchool();
+});
+
+schoolGroups.addEventListener("click", function (e) {
+    if (e.target.closest(".task-edit__cancel")) {
+        editingSchoolId = null;
+        renderSchool();
+        return;
+    }
+    if (e.target.closest(".task-edit-form")) return;
+
+    var li = e.target.closest(".task");
+    if (!li) return;
+    var id = li.getAttribute("data-id");
+    var task = schoolState.tasks.find(function (t) { return t.id === id; });
+    if (!task) return;
+    if (e.target.closest(".task__star")) { task.priority = !task.priority; commitSchool(); }
+    else if (e.target.closest(".task__move")) {
+        schoolState.tasks = schoolState.tasks.filter(function (t) { return t.id !== id; });
+        state.tasks.push({
+            id: task.id, text: task.child ? task.text + " (" + task.child + ")" : task.text,
+            time: "", done: task.done, priority: task.priority, order: state.tasks.length
+        });
+        if (editingSchoolId === id) editingSchoolId = null;
+        commitSchool();
+        commit();
+    }
+    else if (e.target.closest(".task__edit")) {
+        editingSchoolId = task.id;
+        renderSchool();
+    }
+    else if (e.target.closest(".task__del")) {
+        if (editingSchoolId === id) editingSchoolId = null;
+        schoolState.tasks = schoolState.tasks.filter(function (t) { return t.id !== id; });
+        commitSchool();
+    }
+    else { task.done = e.target.classList.contains("task__box") ? e.target.checked : !task.done; commitSchool(); }
+});
+
+schoolGroups.addEventListener("submit", function (e) {
+    var form = e.target.closest(".task-edit-form");
+    if (!form) return;
+    e.preventDefault();
+    var li = form.closest(".task");
+    var id = li && li.getAttribute("data-id");
+    var task = schoolState.tasks.find(function (t) { return t.id === id; });
+    editingSchoolId = null;
+    if (!task) { renderSchool(); return; }
+    var newText = form.querySelector(".task-edit__text").value.trim();
+    if (newText) task.text = newText.slice(0, 140);
+    task.child = form.querySelector(".task-edit__child").value.trim();
+    task.dueDate = form.querySelector(".task-edit__date").value || "";
+    commitSchool();
+});
+
+schoolGroups.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && e.target.closest(".task-edit-form")) {
+        editingSchoolId = null;
+        renderSchool();
+    }
+});
+
 function flash(btn, msg) {
     var original = btn.textContent;
     btn.textContent = msg; btn.disabled = true;
@@ -425,7 +561,7 @@ var importFile = document.getElementById("importFile");
 
 exportBtn.addEventListener("click", function () {
     var payload = JSON.stringify({
-        tasks: state.tasks, somedayTasks: somedayState.tasks,
+        tasks: state.tasks, somedayTasks: somedayState.tasks, schoolTasks: schoolState.tasks,
         date: dateKey, exportedAt: new Date().toISOString()
     }, null, 2);
     if (window.claude && window.claude.downloads) {
@@ -454,6 +590,7 @@ importFile.addEventListener("change", function () {
             mergeState(incoming);
             commit();
             commitSomeday();
+            commitSchool();
             flash(importBtn, "Importado ✓");
         } catch (e) { flash(importBtn, "Archivo no válido"); }
         importFile.value = "";
@@ -462,7 +599,10 @@ importFile.addEventListener("change", function () {
     reader.readAsText(file);
 });
 
-function mergeTasksInto(targetTasks, incomingTasks) {
+// extraFields: nombres de campos de texto adicionales a copiar tal cual
+// desde el objeto de origen (usado para child/dueDate en "Tareas del
+// cole"; las listas de hoy y "Algún día" no lo necesitan).
+function mergeTasksInto(targetTasks, incomingTasks, extraFields) {
     var existingIds = {};
     targetTasks.forEach(function (t) { existingIds[t.id] = true; });
     var offset = targetTasks.length;
@@ -470,11 +610,15 @@ function mergeTasksInto(targetTasks, incomingTasks) {
     incomingTasks.forEach(function (t, i) {
         if (!t || typeof t.text !== "string" || !t.text.trim()) return;
         if (t.id && existingIds[t.id]) return;
-        targetTasks.push({
+        var task = {
             id: t.id || (Date.now() + "-" + Math.random().toString(36).slice(2, 7)),
             text: t.text.slice(0, 140), time: typeof t.time === "string" ? t.time.slice(0, 12) : "",
             done: !!t.done, priority: !!t.priority, order: offset + added
+        };
+        (extraFields || []).forEach(function (field) {
+            task[field] = typeof t[field] === "string" ? t[field].slice(0, 40) : "";
         });
+        targetTasks.push(task);
         added++;
     });
 }
@@ -482,12 +626,14 @@ function mergeTasksInto(targetTasks, incomingTasks) {
 function mergeState(incoming) {
     mergeTasksInto(state.tasks, Array.isArray(incoming.tasks) ? incoming.tasks : []);
     mergeTasksInto(somedayState.tasks, Array.isArray(incoming.somedayTasks) ? incoming.somedayTasks : []);
+    mergeTasksInto(schoolState.tasks, Array.isArray(incoming.schoolTasks) ? incoming.schoolTasks : [], ["child", "dueDate"]);
 }
 
 // ======================================================================
 // 2) SINCRONIZACIÓN ENTRE DISPOSITIVOS (Firebase Firestore)
 //    Todos los dispositivos que usen el MISMO "código" comparten los
-//    mismos datos del día (y la lista "Algún día") en tiempo real.
+//    mismos datos del día (y las listas "Algún día" y "Tareas del cole")
+//    en tiempo real.
 // ======================================================================
 var CODE_KEY = "tu-dia-sync-code";
 function randomCode() {
@@ -514,13 +660,14 @@ document.getElementById("joinCodeBtn").addEventListener("click", function () {
     location.reload();
 });
 
-var db = null, docRef = null, somedayDocRef = null, remoteReady = false;
-var applyingRemote = false, applyingSomedayRemote = false;
+var db = null, docRef = null, somedayDocRef = null, schoolDocRef = null, remoteReady = false;
+var applyingRemote = false, applyingSomedayRemote = false, applyingSchoolRemote = false;
 var isConfigured = FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PEGA_AQUI") === -1;
 
 // ---- Fábrica de guardado remoto con reintento automático (backoff) ----
-// Se usa una instancia para la lista de hoy y otra para "Algún día", así
-// cada una reintenta de forma independiente si falla su guardado.
+// Se usa una instancia por cada lista (hoy, "Algún día", "Tareas del
+// cole"), así cada una reintenta de forma independiente si falla su
+// guardado.
 function createRemoteSync(getRef, getPayload) {
     var retryTimer = null, retryDelay = 5000, retryCount = 0;
     var MAX_RETRIES = 5;
@@ -568,13 +715,19 @@ var somedaySync = createRemoteSync(
     function () { return somedayDocRef; },
     function () { return { tasks: somedayState.tasks, updatedAt: Date.now() }; }
 );
+var schoolSync = createRemoteSync(
+    function () { return schoolDocRef; },
+    function () { return { tasks: schoolState.tasks, updatedAt: Date.now() }; }
+);
 function pushRemote() { dailySync.push(); }
 function pushSomedayRemote() { somedaySync.push(); }
+function pushSchoolRemote() { schoolSync.push(); }
 
 window.addEventListener("online", function () {
     if (!syncErrorNote.hidden) {
         dailySync.retryNow();
         somedaySync.retryNow();
+        schoolSync.retryNow();
     }
 });
 
@@ -604,6 +757,7 @@ async function initFirebaseSync() {
         try { enableIndexedDbPersistence(db); } catch (e) { }
         docRef = doc(db, "planners", syncCode, "days", dateKey);
         somedayDocRef = doc(db, "planners", syncCode, "someday", "list");
+        schoolDocRef = doc(db, "planners", syncCode, "school", "list");
 
         setSyncStatus("", "Conectando…");
 
@@ -720,6 +874,21 @@ async function initFirebaseSync() {
         }, function (err) {
             console.error("Firestore error (Algún día):", err);
         });
+
+        onSnapshot(schoolDocRef, function (snap) {
+            if (snap.exists()) {
+                var remote = snap.data();
+                applyingSchoolRemote = true;
+                schoolState = { tasks: remote.tasks || [] };
+                saveSchoolLocal();
+                if (!editingSchoolId) renderSchool();
+                applyingSchoolRemote = false;
+            } else {
+                pushSchoolRemote();
+            }
+        }, function (err) {
+            console.error("Firestore error (Tareas del cole):", err);
+        });
     } catch (e) {
         setSyncStatus("err", "Error de configuración");
         console.error(e);
@@ -744,9 +913,16 @@ function commitSomeday() {
     if (applyingSomedayRemote) return;
     pushSomedayRemote();
 }
+function commitSchool() {
+    saveSchoolLocal();
+    renderSchool();
+    if (applyingSchoolRemote) return;
+    pushSchoolRemote();
+}
 
 paint();
 paintSomeday();
+paintSchool();
 
 // Revisa cada minuto si alguna tarea pendiente ya venció su hora, para
 // moverla automáticamente a "Tareas sin realizar" sin recargar. Se

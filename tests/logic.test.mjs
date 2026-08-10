@@ -21,6 +21,11 @@ import {
     taskHtml,
     taskEditHtml,
     splitSomedayForRender,
+    formatShortDate,
+    isSchoolTaskOverdue,
+    groupSchoolTasksByChild,
+    schoolTaskHtml,
+    schoolTaskEditHtml,
 } from "../js/logic.mjs";
 
 describe("escapeHtml", function () {
@@ -215,5 +220,96 @@ describe("splitSomedayForRender", function () {
         var groups = splitSomedayForRender(tasks);
         assert.deepEqual(groups.pending.map(function (t) { return t.id; }), ["2", "1"]);
         assert.deepEqual(groups.done.map(function (t) { return t.id; }), ["3"]);
+    });
+});
+
+describe("formatShortDate", function () {
+    test("da formato corto en español", function () {
+        assert.equal(formatShortDate("2026-08-14"), "14 ago");
+        assert.equal(formatShortDate("2026-01-05"), "5 ene");
+    });
+    test("devuelve '' para vacío o inválido", function () {
+        assert.equal(formatShortDate(""), "");
+        assert.equal(formatShortDate(null), "");
+        assert.equal(formatShortDate("no es una fecha"), "");
+    });
+});
+
+describe("isSchoolTaskOverdue", function () {
+    test("vencida si la fecha límite ya pasó y no está hecha", function () {
+        assert.equal(isSchoolTaskOverdue({ done: false, dueDate: "2026-08-09" }, "2026-08-10"), true);
+        assert.equal(isSchoolTaskOverdue({ done: false, dueDate: "2026-08-10" }, "2026-08-10"), false);
+        assert.equal(isSchoolTaskOverdue({ done: false, dueDate: "2026-08-11" }, "2026-08-10"), false);
+    });
+    test("una tarea hecha nunca está vencida", function () {
+        assert.equal(isSchoolTaskOverdue({ done: true, dueDate: "2026-08-09" }, "2026-08-10"), false);
+    });
+    test("sin fecha límite nunca está vencida", function () {
+        assert.equal(isSchoolTaskOverdue({ done: false, dueDate: "" }, "2026-08-10"), false);
+    });
+});
+
+describe("groupSchoolTasksByChild", function () {
+    test("agrupa por hijo/a, normalizando mayúsculas para no duplicar grupos", function () {
+        var tasks = [
+            { id: "1", text: "Tarea 1", child: "Adriana", done: false, order: 0 },
+            { id: "2", text: "Tarea 2", child: "adriana", done: false, order: 1 },
+            { id: "3", text: "Tarea 3", child: "Andrés", done: false, order: 0 },
+        ];
+        var groups = groupSchoolTasksByChild(tasks);
+        assert.equal(groups.length, 2);
+        var adriana = groups.find(function (g) { return g.child === "Adriana"; });
+        assert.ok(adriana);
+        assert.equal(adriana.pending.length, 2); // "Adriana" y "adriana" quedan en el mismo grupo
+    });
+    test("las tareas sin hijo/a van a un grupo 'Sin asignar' al final", function () {
+        var tasks = [
+            { id: "1", text: "Con hijo", child: "Andrés", done: false, order: 0 },
+            { id: "2", text: "Sin hijo", child: "", done: false, order: 0 },
+        ];
+        var groups = groupSchoolTasksByChild(tasks);
+        assert.equal(groups[groups.length - 1].child, "");
+        assert.equal(groups[groups.length - 1].pending[0].text, "Sin hijo");
+    });
+    test("separa pendientes y hechas dentro de cada grupo, ordenadas por 'order'", function () {
+        var tasks = [
+            { id: "1", text: "b", child: "Andrés", done: false, order: 1 },
+            { id: "2", text: "a", child: "Andrés", done: false, order: 0 },
+            { id: "3", text: "hecha", child: "Andrés", done: true, order: 0 },
+        ];
+        var groups = groupSchoolTasksByChild(tasks);
+        assert.deepEqual(groups[0].pending.map(function (t) { return t.id; }), ["2", "1"]);
+        assert.deepEqual(groups[0].done.map(function (t) { return t.id; }), ["3"]);
+    });
+});
+
+describe("schoolTaskHtml", function () {
+    test("muestra la fecha límite formateada cuando hay una", function () {
+        var html = schoolTaskHtml({ id: "1", text: "x", dueDate: "2026-08-14", done: false, priority: false }, false);
+        assert.ok(html.includes("14 ago"));
+    });
+    test("no muestra fecha si no tiene dueDate", function () {
+        var html = schoolTaskHtml({ id: "1", text: "x", dueDate: "", done: false, priority: false }, false);
+        assert.ok(!html.includes("task__time"));
+    });
+    test("agrega la clase task--overdue solo si se pide", function () {
+        var t = { id: "1", text: "x", dueDate: "2026-08-01", done: false, priority: false };
+        assert.ok(schoolTaskHtml(t, true).includes("task--overdue"));
+        assert.ok(!schoolTaskHtml(t, false).includes("task--overdue"));
+    });
+    test("escapa el texto de la tarea", function () {
+        var html = schoolTaskHtml({ id: "1", text: "<b>hola</b>", done: false, priority: false }, false);
+        assert.ok(html.includes("&lt;b&gt;hola&lt;/b&gt;"));
+    });
+});
+
+describe("schoolTaskEditHtml", function () {
+    test("incluye inputs de texto, hijo/a y fecha", function () {
+        var html = schoolTaskEditHtml({ id: "1", text: "Tarea", child: "Adriana", dueDate: "2026-08-14" });
+        assert.ok(html.includes("task-edit__text"));
+        assert.ok(html.includes("task-edit__child"));
+        assert.ok(html.includes("task-edit__date"));
+        assert.ok(html.includes("Adriana"));
+        assert.ok(html.includes("2026-08-14"));
     });
 });
