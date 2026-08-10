@@ -73,13 +73,15 @@ function markCarryDone() {
 
 // Paso 1: lo que este dispositivo tenga guardado localmente del
 // último día anterior con datos (rápido, funciona sin conexión).
+// Queda accesible más abajo (initFirebaseSync) como respaldo del paso 2.
+var localPending = [];
 if (!carryAlreadyDone) {
     try {
         var prevKey = findPreviousDayKey(now, dateKey, 30, function (k) {
             return localStorage.getItem("planner-" + k) != null;
         });
         var prevState = prevKey ? JSON.parse(localStorage.getItem("planner-" + prevKey) || "null") : null;
-        var localPending = prevState && Array.isArray(prevState.tasks)
+        localPending = prevState && Array.isArray(prevState.tasks)
             ? prevState.tasks.filter(function (t) { return t && !t.done; })
             : [];
         if (applyCarryOver(state, localPending)) saveLocal();
@@ -410,36 +412,38 @@ async function initFirebaseSync() {
 
         setSyncStatus("", "Conectando…");
 
-        // Paso 2: busca en Firestore el día más reciente anterior a
-        // hoy (con datos de CUALQUIER dispositivo que use este mismo
-        // código), por si este dispositivo no tenía esos datos en su
-        // propio localStorage.
-        var remoteCarryPending = null;
-        function tryApplyRemoteCarry() {
-            if (remoteCarryPending && applyCarryOver(state, remoteCarryPending)) {
-                saveLocal();
-                render();
-                if (!applyingRemote) pushRemote();
-            }
-        }
+        // Paso 2: busca en Firestore el día más reciente anterior a hoy
+        // (con datos de CUALQUIER dispositivo que use este mismo código),
+        // por si este dispositivo no tenía esos datos en su propio
+        // localStorage. Se espera a que termine ANTES de suscribirse al
+        // snapshot en tiempo real (más abajo): si no se esperara, el
+        // primer snapshot remoto podía llegar antes de tener esta lista,
+        // reemplazar el estado local ya trasladado por uno sin trasladar,
+        // y pintarlo así — el traslado "aparecía un segundo y desaparecía".
+        // Usa localPending (lo que ya se encontró en el paso 1) como valor
+        // de respaldo si la consulta a la nube falla o no encuentra nada,
+        // para que el traslado no dependa exclusivamente de que Firestore
+        // tenga permiso de "list" sobre la colección.
+        var remoteCarryPending = localPending;
         if (!carryAlreadyDone) {
-            var daysCol = collection(db, "planners", syncCode, "days");
-            var prevDayQuery = query(daysCol, where(documentId(), "<", dateKey), orderBy(documentId(), "desc"), limitFn(1));
-            getDocs(prevDayQuery).then(function (qsnap) {
+            try {
+                var daysCol = collection(db, "planners", syncCode, "days");
+                var prevDayQuery = query(daysCol, where(documentId(), "<", dateKey), orderBy(documentId(), "desc"), limitFn(1));
+                var qsnap = await getDocs(prevDayQuery);
                 var docData = qsnap.empty ? null : qsnap.docs[0].data();
-                remoteCarryPending = docData && Array.isArray(docData.tasks)
+                var cloudPending = docData && Array.isArray(docData.tasks)
                     ? docData.tasks.filter(function (t) { return t && !t.done; })
                     : [];
-                tryApplyRemoteCarry();
+                if (cloudPending.length) remoteCarryPending = cloudPending;
                 markCarryDone();
-            }).catch(function (err) {
-                // No se marca como hecho: se reintentará en la
-                // próxima carga (por ejemplo, si fue un error de red
-                // o de permisos temporal). Se avisa igual, en vez de
-                // fallar en silencio.
+            } catch (err) {
+                // No se marca como hecho: se reintentará en la próxima
+                // carga (por ejemplo, si fue un error de red o de
+                // permisos temporal). Se avisa igual, en vez de fallar en
+                // silencio; mientras tanto se sigue usando localPending.
                 console.error("No se pudo revisar el día anterior en la nube:", err);
                 showSyncError("No se pudo revisar la nube por tareas de días anteriores; se usó lo que había en este dispositivo.");
-            });
+            }
         }
 
         onSnapshot(docRef, function (snap) {
