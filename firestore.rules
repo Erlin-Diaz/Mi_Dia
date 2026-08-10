@@ -1,0 +1,35 @@
+// Reglas de seguridad de Firestore para "Tu día".
+//
+// MODELO DE SEGURIDAD: esta app no tiene login. El "código de
+// sincronización" (una cadena aleatoria de 10 caracteres, generada en el
+// dispositivo y mostrada en la fila de sincronización) funciona como una
+// contraseña compartida: cualquiera que la conozca puede leer y escribir
+// esos datos. Es un modelo deliberadamente simple para una app personal
+// de uso familiar, no apto para datos sensibles.
+//
+// CÓMO APLICAR ESTE ARCHIVO (no se puede desplegar automáticamente desde
+// acá, hace falta hacerlo manualmente una vez):
+//   Opción A — Consola de Firebase:
+//     Firebase Console → tu proyecto → Firestore Database → pestaña
+//     "Reglas" → pegar este contenido → "Publicar".
+//   Opción B — Firebase CLI (si la tenés instalada):
+//     firebase deploy --only firestore:rules
+//
+// POR QUÉ HACE FALTA "list" ADEMÁS DE "get":
+//   El traslado automático de tareas pendientes busca el día más
+//   reciente anterior a hoy con una consulta (orderBy + limit) sobre la
+//   colección "days", no accediendo a un documento puntual por su fecha.
+//   Esa operación es "list" en Firestore, y las reglas de solo "get" no
+//   alcanzan para permitirla — si esa consulta falla con
+//   "permission-denied" en la consola del navegador, es este el motivo.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /planners/{code}/days/{date} {
+      allow get, list: if true;
+      allow write: if true;
+    }
+  }
+}
