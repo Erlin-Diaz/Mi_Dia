@@ -585,6 +585,8 @@
 
         <footer class="page__footer">
             <div class="footer__group">
+                <button class="ghost-btn" id="bringYesterdayBtn" type="button"
+                    title="Traer las tareas sin realizar del día anterior guardado">Traer de ayer</button>
                 <button class="ghost-btn" id="importBtn" type="button"
                     title="Cargar tareas y notas desde un archivo exportado">Importar</button>
                 <button class="ghost-btn" id="exportBtn" type="button"
@@ -915,6 +917,38 @@ else { task.done = e.target.classList.contains("task__box") ? e.target.checked :
                 notesArea.value = state.notes;
             }
         }
+
+        // ---- Traer manualmente las tareas sin realizar de un día anterior ----
+        // Útil si hoy ya se abrió la app antes de que existiera el traslado
+        // automático, o si se quiere volver a intentar traer lo pendiente.
+        function formatDateKey(d) {
+            return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        }
+        function findPreviousDayKey(maxDays) {
+            for (var i = 1; i <= maxDays; i++) {
+                var d = new Date(now);
+                d.setDate(d.getDate() - i);
+                var key = formatDateKey(d);
+                if (key !== dateKey && localStorage.getItem("planner-" + key) != null) return key;
+            }
+            return null;
+        }
+        var bringYesterdayBtn = document.getElementById("bringYesterdayBtn");
+        bringYesterdayBtn.addEventListener("click", function () {
+            var prevKey = findPreviousDayKey(30);
+            if (!prevKey) { flash(bringYesterdayBtn, "No hay tareas anteriores"); return; }
+            var prevState = null;
+            try { prevState = JSON.parse(localStorage.getItem("planner-" + prevKey)); } catch (e) { }
+            var pendingTasks = prevState && Array.isArray(prevState.tasks)
+                ? prevState.tasks.filter(function (t) { return t && !t.done; })
+                : [];
+            if (!pendingTasks.length) { flash(bringYesterdayBtn, "Nada pendiente"); return; }
+            var before = state.tasks.length;
+            mergeState({ tasks: pendingTasks });
+            var added = state.tasks.length - before;
+            if (added) { commit(); flash(bringYesterdayBtn, "Traídas " + added + " ✓"); }
+            else { flash(bringYesterdayBtn, "Ya estaban todas"); }
+        });
 
         // ======================================================================
         // 2) SINCRONIZACIÓN ENTRE DISPOSITIVOS (Firebase Firestore)
