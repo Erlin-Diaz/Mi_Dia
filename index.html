@@ -5,6 +5,16 @@
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Tu día</title>
+    <script>
+        // Aplica el tema guardado antes de pintar, para evitar el parpadeo
+        // del tema equivocado al cargar la página.
+        (function () {
+            try {
+                var t = localStorage.getItem("tu-dia-theme");
+                if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+            } catch (e) { }
+        })();
+    </script>
     <style>
         :root {
             color-scheme: light dark;
@@ -19,6 +29,11 @@
 --ok: light-dark(#6E6E74, #9A9AA0);
             --radius: 4px;
         }
+
+        /* Tema elegido manualmente: fuerza la resolución de light-dark(),
+           en vez de seguir la preferencia del sistema. */
+        :root[data-theme="light"] { color-scheme: light; }
+        :root[data-theme="dark"] { color-scheme: dark; }
 
         * {
             box-sizing: border-box;
@@ -72,6 +87,31 @@
   background-size: 18px 16px;
   background-repeat: repeat-x;
   background-position: 6px 0;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.theme-toggle:hover {
+  color: var(--accent);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
 }
 
         header {
@@ -504,6 +544,7 @@
 <body>
 
     <div class="page">
+        <button type="button" id="themeToggle" class="theme-toggle" aria-label="Cambiar tema" title="Cambiar tema"></button>
         <header>
             <div class="header__text">
                 <p class="eyebrow" id="greeting">Buenos días</p>
@@ -605,6 +646,44 @@
         var syncCodeText = document.getElementById("syncCodeText");
 
         notesArea.value = state.notes || "";
+
+        // ---- Alternar tema claro/oscuro manualmente ----
+        var THEME_KEY = "tu-dia-theme";
+        var themeToggle = document.getElementById("themeToggle");
+        var THEME_ICONS = {
+            sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>',
+            moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>'
+        };
+        function systemPrefersDark() {
+            return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        }
+        function activeTheme() {
+            var chosen = document.documentElement.getAttribute("data-theme");
+            if (chosen === "light" || chosen === "dark") return chosen;
+            return systemPrefersDark() ? "dark" : "light";
+        }
+        function paintThemeToggle() {
+            var theme = activeTheme();
+            // El icono representa el modo al que se cambiará al pulsar.
+            themeToggle.innerHTML = theme === "dark" ? THEME_ICONS.sun : THEME_ICONS.moon;
+            var label = theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+            themeToggle.setAttribute("aria-label", label);
+            themeToggle.title = label;
+        }
+        if (themeToggle) {
+            paintThemeToggle();
+            themeToggle.addEventListener("click", function () {
+                var next = activeTheme() === "dark" ? "light" : "dark";
+                document.documentElement.setAttribute("data-theme", next);
+                try { localStorage.setItem(THEME_KEY, next); } catch (e) { }
+                paintThemeToggle();
+            });
+            if (window.matchMedia) {
+                window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+                    if (!document.documentElement.hasAttribute("data-theme")) paintThemeToggle();
+                });
+            }
+        }
 
         function saveLocal() {
             try { localStorage.setItem(localStorageKey, JSON.stringify(state)); } catch (e) { }
