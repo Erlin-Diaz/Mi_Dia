@@ -19,6 +19,8 @@ import {
     computeDialPct,
     isDayComplete,
     taskHtml,
+    taskEditHtml,
+    splitSomedayForRender,
 } from "../js/logic.mjs";
 
 describe("escapeHtml", function () {
@@ -181,5 +183,37 @@ describe("taskHtml", function () {
         var base = { id: "1", text: "x", done: false, priority: false };
         assert.ok(!taskHtml(base, false).includes("task__badge"));
         assert.ok(taskHtml(Object.assign({}, base, { carried: true }), false).includes("task__badge"));
+    });
+    test("agrega el botón de mover solo si se pasa moveLabel", function () {
+        var t = { id: "1", text: "x", done: false, priority: false };
+        assert.ok(!taskHtml(t, false).includes("task__move"));
+        var html = taskHtml(t, false, { moveLabel: "Mover a Sin fecha" });
+        assert.ok(html.includes("task__move"));
+        assert.ok(html.includes("Mover a Sin fecha"));
+    });
+});
+
+describe("taskEditHtml", function () {
+    var t = { id: "1", text: "Comprar pan", time: "08:00" };
+    test("incluye el input de hora por defecto", function () {
+        assert.ok(taskEditHtml(t).includes("task-edit__time"));
+    });
+    test("omite el input de hora si showTime es false", function () {
+        var html = taskEditHtml(t, { showTime: false });
+        assert.ok(!html.includes("task-edit__time"));
+        assert.ok(html.includes("task-edit__text")); // el texto se sigue pudiendo editar
+    });
+});
+
+describe("splitSomedayForRender", function () {
+    test("separa pendientes y hechas, ordenadas por 'order'", function () {
+        var tasks = [
+            { id: "1", text: "b", done: false, order: 1 },
+            { id: "2", text: "a", done: false, order: 0 },
+            { id: "3", text: "hecha", done: true, order: 2 },
+        ];
+        var groups = splitSomedayForRender(tasks);
+        assert.deepEqual(groups.pending.map(function (t) { return t.id; }), ["2", "1"]);
+        assert.deepEqual(groups.done.map(function (t) { return t.id; }), ["3"]);
     });
 });

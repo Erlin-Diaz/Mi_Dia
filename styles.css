@@ -293,7 +293,7 @@ body {
             outline: none;
         }
 
-        #taskInput {
+        #taskInput, #somedayInput {
             flex: 1;
             min-width: 0;
         }
@@ -470,10 +470,11 @@ body {
             margin-right: -8px;
         }
 
-.task__star, .task__edit, .task__del { border: none; background: none; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 8px; color: var(--ink-faint); opacity: 0.55; }
-.task:hover .task__star, .task:hover .task__edit, .task:hover .task__del { opacity: 1; }
+.task__star, .task__move, .task__edit, .task__del { border: none; background: none; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 8px; color: var(--ink-faint); opacity: 0.55; }
+.task:hover .task__star, .task:hover .task__move, .task:hover .task__edit, .task:hover .task__del { opacity: 1; }
 .task__star:hover { color: var(--urgent-text); }
 .task__star[aria-pressed="true"] { color: var(--urgent-text); opacity: 1; }
+.task__move:hover { color: var(--accent); }
 .task__edit:hover { color: var(--accent); }
 .task__del:hover { color: var(--ink); }
 
@@ -554,7 +555,7 @@ body {
             display: flex;
         }
 
-        .notes {
+        .someday {
             margin-top: 34px;
         }
 
@@ -569,23 +570,10 @@ body {
             margin-bottom: 10px;
         }
 
-        #notesArea {
-            width: 100%;
-            min-height: 84px;
-            resize: vertical;
-            border: none;
-            background: transparent;
-            background-image: repeating-linear-gradient(var(--surface), var(--surface) 27px, var(--line) 28px);
-            color: var(--ink);
-            font-size: 0.95rem;
-            line-height: 28px;
-            padding: 0;
-            outline: none;
-        }
-
-        #notesArea::placeholder {
-            color: var(--ink-faint);
-            line-height: 28px;
+        /* La lista "Sin fecha" reutiliza .add-row/.task-list/.task, pero sin
+           input de hora (no aplica: estas tareas no tienen día ni hora). */
+        .someday .add-row {
+            border-bottom-color: var(--line);
         }
 
         .page__footer {

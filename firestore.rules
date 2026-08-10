@@ -31,5 +31,11 @@ service cloud.firestore {
       allow get, list: if true;
       allow write: if true;
     }
+    // Lista "Sin fecha": un único documento ("list") por código, con las
+    // tareas que no están atadas a un día en particular.
+    match /planners/{code}/someday/{doc} {
+      allow get, list: if true;
+      allow write: if true;
+    }
   }
 }

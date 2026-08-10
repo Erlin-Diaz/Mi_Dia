@@ -6,7 +6,7 @@
 import {
     escapeHtml, parseTimeToMinutes, byTimeThenOrder, isOverdue,
     formatDateKey, findPreviousDayKey, applyCarryOver, splitTasksForRender,
-    computeDialPct, isDayComplete, taskHtml, taskEditHtml,
+    splitSomedayForRender, computeDialPct, isDayComplete, taskHtml, taskEditHtml,
 } from "./logic.mjs";
 
 // ======================================================================
@@ -43,6 +43,7 @@ var setDocFn = null; // se completa cuando (si) Firebase termina de cargar
 var now = new Date();
 var dateKey = formatDateKey(now);
 var localStorageKey = "planner-" + dateKey;
+var SOMEDAY_KEY = "planner-someday"; // no lleva fecha: no se resetea cada día
 
 var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 var hour = now.getHours();
@@ -50,10 +51,17 @@ document.getElementById("greeting").textContent = hour < 12 ? "Buenos días" : h
 document.getElementById("dateHeading").textContent = now.toLocaleDateString("es-ES", { day: "numeric", month: "long" });
 document.getElementById("dayName").textContent = now.toLocaleDateString("es-ES", { weekday: "long" });
 
-var state = { tasks: [], notes: "" };
+var state = { tasks: [] };
 try {
     var saved = localStorage.getItem(localStorageKey);
     if (saved) state = JSON.parse(saved);
+} catch (e) { }
+
+// Lista "Sin fecha": tareas sin día asociado (no se resetean, no vencen).
+var somedayState = { tasks: [] };
+try {
+    var savedSomeday = localStorage.getItem(SOMEDAY_KEY);
+    if (savedSomeday) somedayState = JSON.parse(savedSomeday);
 } catch (e) { }
 
 // Trae automáticamente, una sola vez por día, las tareas que quedaron
@@ -94,7 +102,6 @@ if (!carryAlreadyDone) {
 var taskList = document.getElementById("taskList");
 var dial = document.getElementById("dial");
 var progressCount = document.getElementById("progressCount");
-var notesArea = document.getElementById("notesArea");
 var taskInput = document.getElementById("taskInput");
 var timeInput = document.getElementById("timeInput");
 var syncRow = document.getElementById("syncRow");
@@ -105,8 +112,8 @@ var syncErrorNote = document.getElementById("syncErrorNote");
 var settingsToggle = document.getElementById("settingsToggle");
 var settingsDot = document.getElementById("settingsDot");
 var dayCompleteEl = document.getElementById("dayComplete");
-
-notesArea.value = state.notes || "";
+var somedayTaskList = document.getElementById("somedayTaskList");
+var somedayInput = document.getElementById("somedayInput");
 
 // ---- Ajustes: la fila de sincronización queda oculta hasta que se pida ----
 settingsToggle.addEventListener("click", function () {
@@ -170,17 +177,22 @@ if (themeToggle) {
 function saveLocal() {
     try { localStorage.setItem(localStorageKey, JSON.stringify(state)); } catch (e) { }
 }
+function saveSomedayLocal() {
+    try { localStorage.setItem(SOMEDAY_KEY, JSON.stringify(somedayState)); } catch (e) { }
+}
 
 // ---- Edición en línea (reemplaza los prompt()/alert() del navegador) ----
-var editingTaskId = null;
+var editingTaskId = null; // id en edición en la lista de hoy
+var editingSomedayId = null; // id en edición en la lista "Sin fecha"
 
 function paint() {
     var nowDate = new Date();
     var nowMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
     var groups = splitTasksForRender(state.tasks, nowMinutes);
+    var moveOpts = { moveLabel: "Mover a Sin fecha", moveIcon: "&#8658;" };
 
     function renderTask(t, overdue) {
-        return t.id === editingTaskId ? taskEditHtml(t) : taskHtml(t, overdue);
+        return t.id === editingTaskId ? taskEditHtml(t) : taskHtml(t, overdue, moveOpts);
     }
 
     var html = groups.upcoming.map(function (t) { return renderTask(t, false); }).join("");
@@ -203,11 +215,34 @@ function paint() {
     }
 }
 
+function paintSomeday() {
+    var groups = splitSomedayForRender(somedayState.tasks);
+    var moveOpts = { moveLabel: "Mover a hoy", moveIcon: "&#8656;" };
+
+    function renderTask(t) {
+        return t.id === editingSomedayId ? taskEditHtml(t, { showTime: false }) : taskHtml(t, false, moveOpts);
+    }
+
+    somedayTaskList.innerHTML = groups.pending.map(renderTask).join("") + groups.done.map(renderTask).join("");
+
+    if (editingSomedayId) {
+        var input = somedayTaskList.querySelector(".task--editing .task-edit__text");
+        if (input) { input.focus(); input.select(); }
+    }
+}
+
 function render() {
     if (!reduceMotion && document.startViewTransition) {
         document.startViewTransition(paint);
     } else {
         paint();
+    }
+}
+function renderSomeday() {
+    if (!reduceMotion && document.startViewTransition) {
+        document.startViewTransition(paintSomeday);
+    } else {
+        paintSomeday();
     }
 }
 
@@ -237,6 +272,16 @@ taskList.addEventListener("click", function (e) {
     var task = state.tasks.find(function (t) { return t.id === id; });
     if (!task) return;
     if (e.target.closest(".task__star")) { task.priority = !task.priority; commit(); }
+    else if (e.target.closest(".task__move")) {
+        state.tasks = state.tasks.filter(function (t) { return t.id !== id; });
+        somedayState.tasks.push({
+            id: task.id, text: task.text, done: task.done, priority: task.priority,
+            order: somedayState.tasks.length
+        });
+        if (editingTaskId === id) editingTaskId = null;
+        commit();
+        commitSomeday();
+    }
     else if (e.target.closest(".task__edit")) {
         editingTaskId = task.id;
         render();
@@ -276,9 +321,74 @@ document.getElementById("clearDone").addEventListener("click", function () {
     commit();
 });
 
-notesArea.addEventListener("input", function () {
-    state.notes = notesArea.value;
-    commitDebounced();
+// ---- Lista "Sin fecha" (reemplaza el cuadro de notas libres) ----
+document.getElementById("somedayAddForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var text = somedayInput.value.trim();
+    if (!text) return;
+    somedayState.tasks.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+        text: text, time: "", done: false, priority: false, order: somedayState.tasks.length
+    });
+    somedayInput.value = ""; somedayInput.focus();
+    commitSomeday();
+});
+
+somedayTaskList.addEventListener("click", function (e) {
+    if (e.target.closest(".task-edit__cancel")) {
+        editingSomedayId = null;
+        renderSomeday();
+        return;
+    }
+    if (e.target.closest(".task-edit-form")) return;
+
+    var li = e.target.closest(".task");
+    if (!li) return;
+    var id = li.getAttribute("data-id");
+    var task = somedayState.tasks.find(function (t) { return t.id === id; });
+    if (!task) return;
+    if (e.target.closest(".task__star")) { task.priority = !task.priority; commitSomeday(); }
+    else if (e.target.closest(".task__move")) {
+        somedayState.tasks = somedayState.tasks.filter(function (t) { return t.id !== id; });
+        state.tasks.push({
+            id: task.id, text: task.text, time: "", done: task.done, priority: task.priority,
+            order: state.tasks.length
+        });
+        if (editingSomedayId === id) editingSomedayId = null;
+        commitSomeday();
+        commit();
+    }
+    else if (e.target.closest(".task__edit")) {
+        editingSomedayId = task.id;
+        renderSomeday();
+    }
+    else if (e.target.closest(".task__del")) {
+        if (editingSomedayId === id) editingSomedayId = null;
+        somedayState.tasks = somedayState.tasks.filter(function (t) { return t.id !== id; });
+        commitSomeday();
+    }
+    else { task.done = e.target.classList.contains("task__box") ? e.target.checked : !task.done; commitSomeday(); }
+});
+
+somedayTaskList.addEventListener("submit", function (e) {
+    var form = e.target.closest(".task-edit-form");
+    if (!form) return;
+    e.preventDefault();
+    var li = form.closest(".task");
+    var id = li && li.getAttribute("data-id");
+    var task = somedayState.tasks.find(function (t) { return t.id === id; });
+    editingSomedayId = null;
+    if (!task) { renderSomeday(); return; }
+    var newText = form.querySelector(".task-edit__text").value.trim();
+    if (newText) task.text = newText.slice(0, 140);
+    commitSomeday();
+});
+
+somedayTaskList.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && e.target.closest(".task-edit-form")) {
+        editingSomedayId = null;
+        renderSomeday();
+    }
 });
 
 function flash(btn, msg) {
@@ -293,7 +403,10 @@ var importBtn = document.getElementById("importBtn");
 var importFile = document.getElementById("importFile");
 
 exportBtn.addEventListener("click", function () {
-    var payload = JSON.stringify({ tasks: state.tasks, notes: state.notes, date: dateKey, exportedAt: new Date().toISOString() }, null, 2);
+    var payload = JSON.stringify({
+        tasks: state.tasks, somedayTasks: somedayState.tasks,
+        date: dateKey, exportedAt: new Date().toISOString()
+    }, null, 2);
     if (window.claude && window.claude.downloads) {
         window.claude.downloads.save({ filename: "tu-dia-" + dateKey + ".json", data: payload })
             .then(function () { flash(exportBtn, "Exportado ✓"); })
@@ -319,6 +432,7 @@ importFile.addEventListener("change", function () {
             var incoming = JSON.parse(String(reader.result));
             mergeState(incoming);
             commit();
+            commitSomeday();
             flash(importBtn, "Importado ✓");
         } catch (e) { flash(importBtn, "Archivo no válido"); }
         importFile.value = "";
@@ -327,31 +441,32 @@ importFile.addEventListener("change", function () {
     reader.readAsText(file);
 });
 
-function mergeState(incoming) {
-    var incomingTasks = Array.isArray(incoming.tasks) ? incoming.tasks : [];
+function mergeTasksInto(targetTasks, incomingTasks) {
     var existingIds = {};
-    state.tasks.forEach(function (t) { existingIds[t.id] = true; });
-    var offset = state.tasks.length;
+    targetTasks.forEach(function (t) { existingIds[t.id] = true; });
+    var offset = targetTasks.length;
+    var added = 0;
     incomingTasks.forEach(function (t, i) {
         if (!t || typeof t.text !== "string" || !t.text.trim()) return;
         if (t.id && existingIds[t.id]) return;
-        state.tasks.push({
+        targetTasks.push({
             id: t.id || (Date.now() + "-" + Math.random().toString(36).slice(2, 7)),
             text: t.text.slice(0, 140), time: typeof t.time === "string" ? t.time.slice(0, 12) : "",
-            done: !!t.done, priority: !!t.priority, order: offset + i
+            done: !!t.done, priority: !!t.priority, order: offset + added
         });
+        added++;
     });
-    if (typeof incoming.notes === "string" && incoming.notes.trim()) {
-        if (!state.notes || !state.notes.trim()) state.notes = incoming.notes;
-        else if (state.notes.indexOf(incoming.notes) === -1) state.notes = state.notes + "\n\n" + incoming.notes;
-        notesArea.value = state.notes;
-    }
+}
+
+function mergeState(incoming) {
+    mergeTasksInto(state.tasks, Array.isArray(incoming.tasks) ? incoming.tasks : []);
+    mergeTasksInto(somedayState.tasks, Array.isArray(incoming.somedayTasks) ? incoming.somedayTasks : []);
 }
 
 // ======================================================================
 // 2) SINCRONIZACIÓN ENTRE DISPOSITIVOS (Firebase Firestore)
 //    Todos los dispositivos que usen el MISMO "código" comparten los
-//    mismos datos del día en tiempo real.
+//    mismos datos del día (y la lista "Sin fecha") en tiempo real.
 // ======================================================================
 var CODE_KEY = "tu-dia-sync-code";
 function randomCode() {
@@ -378,8 +493,69 @@ document.getElementById("joinCodeBtn").addEventListener("click", function () {
     location.reload();
 });
 
-var db = null, docRef = null, remoteReady = false, applyingRemote = false;
+var db = null, docRef = null, somedayDocRef = null, remoteReady = false;
+var applyingRemote = false, applyingSomedayRemote = false;
 var isConfigured = FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PEGA_AQUI") === -1;
+
+// ---- Fábrica de guardado remoto con reintento automático (backoff) ----
+// Se usa una instancia para la lista de hoy y otra para "Sin fecha", así
+// cada una reintenta de forma independiente si falla su guardado.
+function createRemoteSync(getRef, getPayload) {
+    var retryTimer = null, retryDelay = 5000, retryCount = 0;
+    var MAX_RETRIES = 5;
+    function push() {
+        var ref = getRef();
+        if (!ref || !setDocFn) return;
+        setDocFn(ref, getPayload(), { merge: false })
+            .then(function () {
+                retryCount = 0;
+                retryDelay = 5000;
+                clearTimeout(retryTimer);
+                clearSyncError();
+            })
+            .catch(function (err) {
+                console.error("No se pudo guardar en la nube:", err);
+                scheduleRetry();
+            });
+    }
+    function scheduleRetry() {
+        clearTimeout(retryTimer);
+        if (retryCount >= MAX_RETRIES) {
+            showSyncError("No se pudo guardar en la nube. Tus cambios quedaron en este dispositivo; revisá tu conexión.");
+            return;
+        }
+        showSyncError("No se pudo guardar en la nube, reintentando…");
+        retryTimer = setTimeout(function () {
+            retryCount++;
+            retryDelay = Math.min(retryDelay * 2, 80000);
+            push();
+        }, retryDelay);
+    }
+    function retryNow() {
+        retryCount = 0;
+        retryDelay = 5000;
+        push();
+    }
+    return { push: push, retryNow: retryNow };
+}
+
+var dailySync = createRemoteSync(
+    function () { return docRef; },
+    function () { return { tasks: state.tasks, updatedAt: Date.now() }; }
+);
+var somedaySync = createRemoteSync(
+    function () { return somedayDocRef; },
+    function () { return { tasks: somedayState.tasks, updatedAt: Date.now() }; }
+);
+function pushRemote() { dailySync.push(); }
+function pushSomedayRemote() { somedaySync.push(); }
+
+window.addEventListener("online", function () {
+    if (!syncErrorNote.hidden) {
+        dailySync.retryNow();
+        somedaySync.retryNow();
+    }
+});
 
 async function initFirebaseSync() {
     var appMod, fsMod;
@@ -409,6 +585,7 @@ async function initFirebaseSync() {
         db = getFirestore(app);
         try { enableIndexedDbPersistence(db); } catch (e) { }
         docRef = doc(db, "planners", syncCode, "days", dateKey);
+        somedayDocRef = doc(db, "planners", syncCode, "someday", "list");
 
         setSyncStatus("", "Conectando…");
 
@@ -453,13 +630,12 @@ async function initFirebaseSync() {
             if (snap.exists()) {
                 var remote = snap.data();
                 applyingRemote = true;
-                state = { tasks: remote.tasks || [], notes: remote.notes || "" };
+                state = { tasks: remote.tasks || [] };
                 // El estado remoto reemplaza por completo al local: si el
                 // traslado de ayer todavía no se aplicó a un estado "real"
                 // (por ejemplo, este remoto es de antes de tener esta
                 // función), se aplica ahora para que no se pierda.
                 var carried = applyCarryOver(state, remoteCarryPending);
-                notesArea.value = state.notes;
                 saveLocal();
                 if (!editingTaskId) render();
                 applyingRemote = false;
@@ -472,6 +648,21 @@ async function initFirebaseSync() {
             setSyncStatus("err", "Error de sincronización");
             console.error("Firestore error:", err);
             showSyncError("No se pudo conectar con la nube. Tus cambios se siguen guardando en este dispositivo.");
+        });
+
+        onSnapshot(somedayDocRef, function (snap) {
+            if (snap.exists()) {
+                var remote = snap.data();
+                applyingSomedayRemote = true;
+                somedayState = { tasks: remote.tasks || [] };
+                saveSomedayLocal();
+                if (!editingSomedayId) renderSomeday();
+                applyingSomedayRemote = false;
+            } else {
+                pushSomedayRemote();
+            }
+        }, function (err) {
+            console.error("Firestore error (Sin fecha):", err);
         });
     } catch (e) {
         setSyncStatus("err", "Error de configuración");
@@ -488,64 +679,21 @@ if (!isConfigured) {
     initFirebaseSync();
 }
 
-// ---- Guardado remoto, con reintento automático si falla ----
-var pushTimer = null;
-var pushRetryTimer = null;
-var pushRetryDelay = 5000;
-var pushRetryCount = 0;
-var MAX_PUSH_RETRIES = 5;
-
-function pushRemote() {
-    if (!docRef || !setDocFn) return;
-    setDocFn(docRef, { tasks: state.tasks, notes: state.notes, updatedAt: Date.now() }, { merge: false })
-        .then(function () {
-            pushRetryCount = 0;
-            pushRetryDelay = 5000;
-            clearTimeout(pushRetryTimer);
-            clearSyncError();
-        })
-        .catch(function (err) {
-            console.error("No se pudo guardar en la nube:", err);
-            scheduleRetry();
-        });
-}
-
-function scheduleRetry() {
-    clearTimeout(pushRetryTimer);
-    if (pushRetryCount >= MAX_PUSH_RETRIES) {
-        showSyncError("No se pudo guardar en la nube. Tus cambios quedaron en este dispositivo; revisá tu conexión.");
-        return;
-    }
-    showSyncError("No se pudo guardar en la nube, reintentando…");
-    pushRetryTimer = setTimeout(function () {
-        pushRetryCount++;
-        pushRetryDelay = Math.min(pushRetryDelay * 2, 80000);
-        pushRemote();
-    }, pushRetryDelay);
-}
-
-window.addEventListener("online", function () {
-    if (docRef && !syncErrorNote.hidden) {
-        pushRetryCount = 0;
-        pushRetryDelay = 5000;
-        pushRemote();
-    }
-});
-
 function commit() {
     saveLocal();
     render();
     if (applyingRemote) return;
     pushRemote();
 }
-function commitDebounced() {
-    saveLocal();
-    if (applyingRemote) return;
-    clearTimeout(pushTimer);
-    pushTimer = setTimeout(pushRemote, 500);
+function commitSomeday() {
+    saveSomedayLocal();
+    renderSomeday();
+    if (applyingSomedayRemote) return;
+    pushSomedayRemote();
 }
 
 paint();
+paintSomeday();
 
 // Revisa cada minuto si alguna tarea pendiente ya venció su hora, para
 // moverla automáticamente a "Tareas sin realizar" sin recargar. Se

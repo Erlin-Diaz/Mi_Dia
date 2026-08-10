@@ -67,9 +67,15 @@
             <p class="day-complete" id="dayComplete">🎉&nbsp; ¡Completaste todas tus tareas de hoy!</p>
         </section>
 
-        <section class="notes">
-            <label class="section-label" for="notesArea">En mente</label>
-            <textarea id="notesArea" placeholder="Ideas, recordatorios, cosas que no quieres olvidar…"></textarea>
+        <section class="someday">
+            <span class="section-label">Sin fecha</span>
+            <form class="add-row" id="somedayAddForm">
+                <input type="text" id="somedayInput" placeholder="Algo para anotar, sin fecha…" autocomplete="off"
+                    maxlength="140" />
+                <button type="submit">Añadir</button>
+            </form>
+            <ul class="task-list" id="somedayTaskList"></ul>
+            <p class="empty-state" id="somedayEmptyState">Nada por acá todavía.</p>
         </section>
 
         <footer class="page__footer">

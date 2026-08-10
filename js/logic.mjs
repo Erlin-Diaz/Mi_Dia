@@ -124,9 +124,17 @@ export function isDayComplete(total, doneCount) {
     return total > 0 && doneCount === total;
 }
 
-/** HTML de una tarea, en modo lectura normal (no edición). */
-export function taskHtml(t, overdue) {
+/**
+ * HTML de una tarea, en modo lectura normal (no edición).
+ * opts.moveLabel / opts.moveIcon: si se pasan, agrega un botón "mover"
+ * (usado para pasar tareas entre la lista de hoy y la de "Sin fecha").
+ */
+export function taskHtml(t, overdue, opts) {
+    opts = opts || {};
     var classes = "task" + (t.done ? " task--done" : "") + (t.priority ? " task--priority" : "") + (overdue ? " task--overdue" : "");
+    var moveBtn = opts.moveLabel
+        ? '<button type="button" class="task__move" aria-label="' + escapeHtml(opts.moveLabel) + '" title="' + escapeHtml(opts.moveLabel) + '">' + (opts.moveIcon || "&#8594;") + '</button>'
+        : "";
     return '<li class="' + classes + '" data-id="' + escapeHtml(t.id) + '">' +
         '<label class="task__box-wrap"><input type="checkbox" class="task__box" ' + (t.done ? "checked" : "") + ' aria-label="Marcar como hecho" /></label>' +
         '<span class="task__text">' + escapeHtml(t.text) +
@@ -135,18 +143,35 @@ export function taskHtml(t, overdue) {
         (t.time ? '<span class="task__time">' + escapeHtml(t.time) + '</span>' : "") +
         '<span class="task__actions">' +
         '<button type="button" class="task__star" aria-pressed="' + (t.priority ? "true" : "false") + '" aria-label="Destacar tarea" title="Destacar">&#9679;</button>' +
+        moveBtn +
         '<button type="button" class="task__edit" aria-label="Editar tarea" title="Editar">&#9998;</button>' +
         '<button type="button" class="task__del" aria-label="Eliminar tarea" title="Eliminar">&times;</button>' +
         '</span></li>';
 }
 
-/** HTML de una tarea en modo edición (texto y hora editables en línea). */
-export function taskEditHtml(t) {
+/**
+ * HTML de una tarea en modo edición (texto, y hora si opts.showTime no es
+ * false, editables en línea).
+ */
+export function taskEditHtml(t, opts) {
+    opts = opts || {};
+    var showTime = opts.showTime !== false;
     return '<li class="task task--editing" data-id="' + escapeHtml(t.id) + '">' +
         '<form class="task-edit-form">' +
         '<input type="text" class="task-edit__text" value="' + escapeHtml(t.text) + '" maxlength="140" aria-label="Texto de la tarea" />' +
-        '<input type="time" class="task-edit__time" value="' + escapeHtml(t.time || "") + '" aria-label="Hora de la tarea" />' +
+        (showTime ? '<input type="time" class="task-edit__time" value="' + escapeHtml(t.time || "") + '" aria-label="Hora de la tarea" />' : "") +
         '<button type="submit" class="task-edit__save" aria-label="Guardar" title="Guardar">&#10003;</button>' +
         '<button type="button" class="task-edit__cancel" aria-label="Cancelar" title="Cancelar">&times;</button>' +
         '</form></li>';
+}
+
+/**
+ * Separa las tareas de la lista "Sin fecha" en pendientes y hechas,
+ * ordenadas por el orden en que se agregaron (no tienen hora ni pueden
+ * estar "vencidas").
+ */
+export function splitSomedayForRender(tasks) {
+    var pending = tasks.filter(function (t) { return !t.done; }).sort(function (a, b) { return a.order - b.order; });
+    var done = tasks.filter(function (t) { return t.done; }).sort(function (a, b) { return a.order - b.order; });
+    return { pending: pending, done: done };
 }
