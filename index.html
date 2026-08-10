@@ -629,11 +629,37 @@
         document.getElementById("dateHeading").textContent = now.toLocaleDateString("es-ES", { day: "numeric", month: "long" });
         document.getElementById("dayName").textContent = now.toLocaleDateString("es-ES", { weekday: "long" });
 
+        var LAST_DATE_KEY = "planner-lastDate";
         var state = { tasks: [], notes: "" };
+        var hasTodayLocal = false;
         try {
             var saved = localStorage.getItem(localStorageKey);
-            if (saved) state = JSON.parse(saved);
+            if (saved) { state = JSON.parse(saved); hasTodayLocal = true; }
         } catch (e) { }
+
+        if (!hasTodayLocal) {
+            // Primera vez que se abre hoy: si el día anterior quedaron
+            // tareas sin realizar, se trasladan automáticamente a hoy.
+            try {
+                var lastDate = localStorage.getItem(LAST_DATE_KEY);
+                if (lastDate && lastDate !== dateKey) {
+                    var prevSaved = localStorage.getItem("planner-" + lastDate);
+                    if (prevSaved) {
+                        var prevState = JSON.parse(prevSaved);
+                        var pending = (prevState.tasks || []).filter(function (t) { return t && !t.done; });
+                        state.tasks = pending.map(function (t, i) {
+                            return {
+                                id: t.id || (Date.now() + "-" + Math.random().toString(36).slice(2, 7)),
+                                text: t.text, time: t.time || "",
+                                done: false, priority: !!t.priority, order: i
+                            };
+                        });
+                    }
+                }
+            } catch (e) { }
+            saveLocal(); // deja constancia de hoy para no volver a trasladar en la próxima carga
+        }
+        try { localStorage.setItem(LAST_DATE_KEY, dateKey); } catch (e) { }
 
         var taskList = document.getElementById("taskList");
         var dial = document.getElementById("dial");
