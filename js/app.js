@@ -125,11 +125,20 @@ var settingsDot = document.getElementById("settingsDot");
 var dayCompleteEl = document.getElementById("dayComplete");
 var somedayTaskList = document.getElementById("somedayTaskList");
 var somedayInput = document.getElementById("somedayInput");
+var somedaySection = document.getElementById("somedaySection");
+var somedayCount = document.getElementById("somedayCount");
 
 // ---- Ajustes: la fila de sincronización queda oculta hasta que se pida ----
 settingsToggle.addEventListener("click", function () {
     syncRow.hidden = !syncRow.hidden;
     settingsToggle.setAttribute("aria-expanded", syncRow.hidden ? "false" : "true");
+});
+
+// ---- "Algún día" desplegable: recuerda si quedó abierta o cerrada ----
+var SOMEDAY_OPEN_KEY = "planner-somedayOpen";
+try { somedaySection.open = localStorage.getItem(SOMEDAY_OPEN_KEY) === "1"; } catch (e) { }
+somedaySection.addEventListener("toggle", function () {
+    try { localStorage.setItem(SOMEDAY_OPEN_KEY, somedaySection.open ? "1" : "0"); } catch (e) { }
 });
 
 // ---- Estado de sincronización (dot + texto + aviso de error) ----
@@ -235,6 +244,7 @@ function paintSomeday() {
     }
 
     somedayTaskList.innerHTML = groups.pending.map(renderTask).join("") + groups.done.map(renderTask).join("");
+    somedayCount.textContent = groups.pending.length ? "(" + groups.pending.length + ")" : "";
 
     if (editingSomedayId) {
         var input = somedayTaskList.querySelector(".task--editing .task-edit__text");

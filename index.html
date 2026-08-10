@@ -67,8 +67,8 @@
             <p class="day-complete" id="dayComplete">🎉&nbsp; ¡Completaste todas tus tareas de hoy!</p>
         </section>
 
-        <section class="someday">
-            <span class="section-label">Algún día</span>
+        <details class="someday" id="somedaySection">
+            <summary class="section-label">Algún día <span class="someday__count" id="somedayCount"></span></summary>
             <form class="add-row" id="somedayAddForm">
                 <input type="text" id="somedayInput" placeholder="Algo para anotar, sin fecha…" autocomplete="off"
                     maxlength="140" />
@@ -76,7 +76,7 @@
             </form>
             <ul class="task-list" id="somedayTaskList"></ul>
             <p class="empty-state" id="somedayEmptyState">Nada por acá todavía.</p>
-        </section>
+        </details>
 
         <footer class="page__footer">
             <div class="footer__group">

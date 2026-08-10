@@ -565,6 +565,49 @@ body {
             margin-bottom: 10px;
         }
 
+        /* "Algún día" es un <details>: la etiqueta hace de control para
+           desplegar/ocultar, con flecha propia en vez del triángulo por
+           defecto del navegador. */
+        summary.section-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            list-style: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        summary.section-label::-webkit-details-marker {
+            display: none;
+        }
+
+        summary.section-label::before {
+            content: "";
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 3.5px 0 3.5px 5px;
+            border-color: transparent transparent transparent var(--ink-soft);
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .someday[open] summary.section-label::before {
+            transform: rotate(90deg);
+        }
+
+        summary.section-label:hover {
+            color: var(--accent);
+        }
+
+        .someday__count {
+            color: var(--ink-faint);
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
         /* La lista "Algún día" reutiliza .add-row/.task-list/.task, pero sin
            input de hora (no aplica: estas tareas no tienen día ni hora). */
         .someday .add-row {
