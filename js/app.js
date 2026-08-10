@@ -635,7 +635,15 @@ async function initFirebaseSync() {
                 // traslado de ayer todavía no se aplicó a un estado "real"
                 // (por ejemplo, este remoto es de antes de tener esta
                 // función), se aplica ahora para que no se pierda.
+                // OJO: esto solo puede pasar UNA vez — remoteCarryPending
+                // se vacía enseguida. onSnapshot se vuelve a disparar con
+                // cada cambio (incluido el eco del propio guardado al
+                // borrar/editar una tarea), y si no se vaciara, cualquier
+                // tarea trasladada que se borrara volvería a agregarse
+                // sola en la próxima actualización, sin importar qué la
+                // haya disparado.
                 var carried = applyCarryOver(state, remoteCarryPending);
+                remoteCarryPending = null;
                 saveLocal();
                 if (!editingTaskId) render();
                 applyingRemote = false;
