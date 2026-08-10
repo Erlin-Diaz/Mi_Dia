@@ -79,6 +79,17 @@ function markCarryDone() {
     try { localStorage.setItem(CARRY_MARK_KEY, dateKey); } catch (e) { }
 }
 
+// Se marca de inmediato que el traslado se está intentando hoy, ANTES de
+// hacer nada más (no recién cuando el paso 2 remoto termina bien). Antes,
+// si la consulta a Firestore fallaba (por ejemplo, permiso de "list" sin
+// aplicar en las reglas), la marca nunca se guardaba y el traslado se
+// reintentaba en CADA recarga de la página — reinyectando las mismas
+// tareas de "ayer" una y otra vez, sin importar que ya se hubieran
+// borrado o movido a "Algún día" mientras tanto. Ahora el traslado se
+// intenta como mucho una vez por día calendario, pase lo que pase
+// después con la consulta remota.
+if (!carryAlreadyDone) markCarryDone();
+
 // Paso 1: lo que este dispositivo tenga guardado localmente del
 // último día anterior con datos (rápido, funciona sin conexión).
 // Queda accesible más abajo (initFirebaseSync) como respaldo del paso 2.
@@ -569,7 +580,6 @@ async function initFirebaseSync() {
         console.error("No se pudieron cargar los módulos de Firebase:", e);
         setSyncStatus("err", "Sin conexión con la nube (solo local)");
         showSyncError("No se pudo cargar Firebase. Tus tareas se siguen guardando en este dispositivo.");
-        if (!carryAlreadyDone) markCarryDone();
         return;
     }
 
@@ -612,12 +622,13 @@ async function initFirebaseSync() {
                     ? docData.tasks.filter(function (t) { return t && !t.done; })
                     : [];
                 if (cloudPending.length) remoteCarryPending = cloudPending;
-                markCarryDone();
             } catch (err) {
-                // No se marca como hecho: se reintentará en la próxima
-                // carga (por ejemplo, si fue un error de red o de
-                // permisos temporal). Se avisa igual, en vez de fallar en
-                // silencio; mientras tanto se sigue usando localPending.
+                // El traslado de hoy ya quedó marcado como intentado (más
+                // arriba, antes de llegar acá) aunque esta consulta falle:
+                // no tiene reintento en la próxima carga a propósito, para
+                // no reinyectar sin parar las mismas tareas de "ayer". Se
+                // sigue usando localPending, y se avisa en vez de fallar
+                // en silencio.
                 console.error("No se pudo revisar el día anterior en la nube:", err);
                 showSyncError("No se pudo revisar la nube por tareas de días anteriores; se usó lo que había en este dispositivo.");
             }
@@ -680,9 +691,6 @@ async function initFirebaseSync() {
 
 if (!isConfigured) {
     setSyncStatus("err", "Sin configurar (solo local)");
-    // Sin nube que consultar: lo único posible ya se intentó en el
-    // paso 1 (local), así que el día queda resuelto.
-    if (!carryAlreadyDone) markCarryDone();
 } else {
     initFirebaseSync();
 }
