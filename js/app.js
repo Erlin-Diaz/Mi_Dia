@@ -584,10 +584,8 @@ async function initFirebaseSync() {
     }
 
     var initializeApp = appMod.initializeApp;
-    var getFirestore = fsMod.getFirestore, doc = fsMod.doc, onSnapshot = fsMod.onSnapshot;
+    var getFirestore = fsMod.getFirestore, doc = fsMod.doc, getDoc = fsMod.getDoc, onSnapshot = fsMod.onSnapshot;
     var enableIndexedDbPersistence = fsMod.enableIndexedDbPersistence;
-    var collection = fsMod.collection, query = fsMod.query, where = fsMod.where;
-    var orderBy = fsMod.orderBy, limitFn = fsMod.limit, getDocs = fsMod.getDocs, documentId = fsMod.documentId;
     setDocFn = fsMod.setDoc;
 
     try {
@@ -607,26 +605,55 @@ async function initFirebaseSync() {
         // primer snapshot remoto podía llegar antes de tener esta lista,
         // reemplazar el estado local ya trasladado por uno sin trasladar,
         // y pintarlo así — el traslado "aparecía un segundo y desaparecía".
+        //
+        // Se implementa con lecturas directas por fecha (getDoc), en vez
+        // de una consulta (query + where + orderBy) sobre la colección:
+        // esa consulta necesita un índice compuesto que Firestore no crea
+        // solo, y sin él fallaba con "FAILED_PRECONDITION: the query
+        // requires an index" en cualquier proyecto que no lo haya creado
+        // a mano. Las lecturas directas por id nunca necesitan índice.
+        //
         // Usa localPending (lo que ya se encontró en el paso 1) como valor
-        // de respaldo si la consulta a la nube falla o no encuentra nada,
-        // para que el traslado no dependa exclusivamente de que Firestore
-        // tenga permiso de "list" sobre la colección.
+        // de respaldo si la consulta a la nube falla o no encuentra nada.
         var remoteCarryPending = localPending;
         if (!carryAlreadyDone) {
             try {
-                var daysCol = collection(db, "planners", syncCode, "days");
-                var prevDayQuery = query(daysCol, where(documentId(), "<", dateKey), orderBy(documentId(), "desc"), limitFn(1));
-                var qsnap = await getDocs(prevDayQuery);
-                var docData = qsnap.empty ? null : qsnap.docs[0].data();
-                var cloudPending = docData && Array.isArray(docData.tasks)
-                    ? docData.tasks.filter(function (t) { return t && !t.done; })
-                    : [];
-                if (cloudPending.length) remoteCarryPending = cloudPending;
+                var candidateKeys = [];
+                for (var i = 1; i <= 30; i++) {
+                    var d = new Date(now);
+                    d.setDate(d.getDate() - i);
+                    candidateKeys.push(formatDateKey(d));
+                }
+                var results = await Promise.allSettled(candidateKeys.map(function (key) {
+                    return getDoc(doc(db, "planners", syncCode, "days", key)).then(function (snap) {
+                        return { key: key, snap: snap };
+                    });
+                }));
+                var anyFulfilled = false;
+                var found = null;
+                for (var j = 0; j < results.length; j++) {
+                    if (results[j].status !== "fulfilled") continue;
+                    anyFulfilled = true;
+                    // candidateKeys ya está en orden de más reciente a más
+                    // vieja, así que el primer resultado existente es el
+                    // día anterior más reciente con datos.
+                    if (results[j].value.snap.exists()) { found = results[j].value; break; }
+                }
+                if (!anyFulfilled) {
+                    throw new Error("No se pudo leer ningún día anterior en la nube (conexión o permisos).");
+                }
+                if (found) {
+                    var docData = found.snap.data();
+                    var cloudPending = Array.isArray(docData.tasks)
+                        ? docData.tasks.filter(function (t) { return t && !t.done; })
+                        : [];
+                    if (cloudPending.length) remoteCarryPending = cloudPending;
+                }
             } catch (err) {
                 // El traslado de hoy ya quedó marcado como intentado (más
-                // arriba, antes de llegar acá) aunque esta consulta falle:
-                // no tiene reintento en la próxima carga a propósito, para
-                // no reinyectar sin parar las mismas tareas de "ayer". Se
+                // arriba, antes de llegar acá) aunque esto falle: no tiene
+                // reintento en la próxima carga a propósito, para no
+                // reinyectar sin parar las mismas tareas de "ayer". Se
                 // sigue usando localPending, y se avisa en vez de fallar
                 // en silencio.
                 console.error("No se pudo revisar el día anterior en la nube:", err);
