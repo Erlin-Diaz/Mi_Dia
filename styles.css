@@ -513,6 +513,42 @@ body {
     outline: none;
 }
 
+/* Edición en línea de "Tareas del cole": texto + quién + fecha límite.
+   Igual que el formulario de agregar, el texto ocupa la fila completa
+   arriba, y quién/fecha/guardar/cancelar quedan abajo. */
+.school-edit-form {
+    flex-wrap: wrap;
+}
+
+.school-edit-form .task-edit__text {
+    flex: 1 1 100%;
+}
+
+.task-edit__child {
+    flex: 1 1 100px;
+    min-width: 0;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 4px 2px;
+    outline: none;
+}
+
+.task-edit__date {
+    flex-shrink: 0;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    padding: 4px 2px;
+    outline: none;
+}
+
 .task-edit__save, .task-edit__cancel {
     border: none;
     background: none;
@@ -536,6 +572,14 @@ body {
         }
 
         .task-list:not(:has(.task))~.empty-state {
+            display: block;
+        }
+
+        /* "Tareas del cole" tiene varias <ul> (una por hijo/a) dentro de
+           #schoolGroups, así que el truco de :has() de arriba -pensado
+           para una sola lista- no le sirve; su estado vacío se decide en
+           JS con esta clase. */
+        .empty-state.is-visible {
             display: block;
         }
 
@@ -617,6 +661,43 @@ body {
            input de hora (no aplica: estas tareas no tienen día ni hora). */
         .someday .add-row {
             border-bottom-color: var(--line);
+        }
+
+        /* "Tareas del cole": tres campos (qué / quién / fecha límite) más
+           el botón. Se envuelve en dos filas -el texto ocupa el ancho
+           completo arriba, quién+fecha+Añadir abajo- para que entre bien
+           en pantallas angostas, en vez de forzarlos en una sola fila. */
+        .school-add-row {
+            flex-wrap: wrap;
+        }
+
+        #schoolInput {
+            flex: 1 1 100%;
+            min-width: 0;
+        }
+
+        #schoolChildInput {
+            flex: 1 1 120px;
+            min-width: 0;
+            font-size: 0.85rem;
+            color: var(--ink-soft);
+        }
+
+        #schoolDateInput {
+            flex-shrink: 0;
+            font-family: var(--font-display);
+            font-size: 0.82rem;
+            color: var(--ink-soft);
+        }
+
+        /* Sub-encabezado de cada grupo (hijo/a) dentro de "Tareas del cole". */
+        .school-group-label {
+            margin: 14px 0 6px;
+            font-size: 0.68rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--ink-faint);
+            font-weight: 600;
         }
 
         .page__footer {

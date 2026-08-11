@@ -175,3 +175,117 @@ export function splitSomedayForRender(tasks) {
     var done = tasks.filter(function (t) { return t.done; }).sort(function (a, b) { return a.order - b.order; });
     return { pending: pending, done: done };
 }
+
+// ============================================================================
+// "Tareas del cole": tareas con un hijo/a y una fecha límite (sin hora),
+// agrupadas por hijo/a. Independientes del día -no se resetean-, igual que
+// "Algún día", pero con su propia forma de agrupar y de marcar "vencida".
+// ============================================================================
+
+/**
+ * Da formato corto en español a una fecha "YYYY-MM-DD" (ej. "14 ago").
+ * Devuelve "" si dateKeyStr viene vacío o no se pudo interpretar. Arma la
+ * fecha a partir de sus componentes (no con `new Date(str)`) para evitar
+ * que el desfase horario la corra un día en zonas UTC negativas.
+ */
+export function formatShortDate(dateKeyStr) {
+    if (!dateKeyStr) return "";
+    var parts = String(dateKeyStr).split("-");
+    if (parts.length !== 3) return "";
+    var y = Number(parts[0]), m = Number(parts[1]), d = Number(parts[2]);
+    if (!y || !m || !d) return "";
+    var date = new Date(y, m - 1, d);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
+/**
+ * Una tarea del cole está "vencida" si tiene fecha límite, esa fecha ya
+ * pasó (comparación de strings "YYYY-MM-DD", igual que se hace con
+ * dateKey en el resto de la app) y no está hecha.
+ */
+export function isSchoolTaskOverdue(t, todayKey) {
+    if (t.done || !t.dueDate) return false;
+    return t.dueDate < todayKey;
+}
+
+/**
+ * Agrupa las tareas del cole por hijo/a (t.child), para "desglosarlas" en
+ * vez de mostrar una lista plana. El nombre se normaliza (trim +
+ * minúsculas) solo para decidir a qué grupo pertenece cada tarea -así
+ * "Adriana" y "adriana" no quedan en grupos separados por una diferencia
+ * de mayúsculas-, pero el grupo se muestra con la primera grafía usada.
+ * Sin hijo/a asignado va a un grupo "Sin asignar" al final. Cada grupo
+ * devuelve sus tareas separadas en pendientes/hechas, ordenadas por
+ * "order".
+ */
+export function groupSchoolTasksByChild(tasks) {
+    var byKey = {};
+    var order = [];
+    tasks.forEach(function (t) {
+        var raw = (t.child || "").trim();
+        var key = raw ? raw.toLowerCase() : " sin-asignar";
+        if (!byKey[key]) {
+            byKey[key] = { child: raw, items: [] };
+            order.push(key);
+        }
+        byKey[key].items.push(t);
+    });
+    // El grupo "sin asignar" (si existe) siempre al final.
+    order.sort(function (a, b) {
+        if (a === " sin-asignar") return 1;
+        if (b === " sin-asignar") return -1;
+        return 0;
+    });
+    return order.map(function (key) {
+        var group = byKey[key];
+        var byOrder = function (a, b) { return a.order - b.order; };
+        return {
+            child: group.child, // "" para el grupo "Sin asignar"
+            pending: group.items.filter(function (t) { return !t.done; }).sort(byOrder),
+            done: group.items.filter(function (t) { return t.done; }).sort(byOrder)
+        };
+    });
+}
+
+/**
+ * HTML de una tarea del cole, en modo lectura normal. Calco de taskHtml,
+ * pero muestra la fecha límite (t.dueDate) donde taskHtml muestra la
+ * hora -reutilizando las mismas clases .task__time/.task--overdue, ya
+ * con su contraste verificado-, y no repite el hijo/a en la fila (ya lo
+ * indica el encabezado del grupo en el que está agrupada).
+ */
+export function schoolTaskHtml(t, overdue, opts) {
+    opts = opts || {};
+    var classes = "task" + (t.done ? " task--done" : "") + (t.priority ? " task--priority" : "") + (overdue ? " task--overdue" : "");
+    var moveBtn = opts.moveLabel
+        ? '<button type="button" class="task__move" aria-label="' + escapeHtml(opts.moveLabel) + '" title="' + escapeHtml(opts.moveLabel) + '">' + (opts.moveIcon || "&#8594;") + '</button>'
+        : "";
+    var dateLabel = formatShortDate(t.dueDate);
+    return '<li class="' + classes + '" data-id="' + escapeHtml(t.id) + '">' +
+        '<label class="task__box-wrap"><input type="checkbox" class="task__box" ' + (t.done ? "checked" : "") + ' aria-label="Marcar como hecho" /></label>' +
+        '<span class="task__text">' + escapeHtml(t.text) + '</span>' +
+        (dateLabel ? '<span class="task__time">' + escapeHtml(dateLabel) + '</span>' : "") +
+        '<span class="task__actions">' +
+        '<button type="button" class="task__star" aria-pressed="' + (t.priority ? "true" : "false") + '" aria-label="Destacar tarea" title="Destacar">&#9679;</button>' +
+        moveBtn +
+        '<button type="button" class="task__edit" aria-label="Editar tarea" title="Editar">&#9998;</button>' +
+        '<button type="button" class="task__del" aria-label="Eliminar tarea" title="Eliminar">&times;</button>' +
+        '</span></li>';
+}
+
+/**
+ * HTML de una tarea del cole en modo edición: texto, hijo/a y fecha
+ * límite editables en línea. Calco de taskEditHtml, con "quién" y fecha
+ * en vez de hora.
+ */
+export function schoolTaskEditHtml(t) {
+    return '<li class="task task--editing" data-id="' + escapeHtml(t.id) + '">' +
+        '<form class="task-edit-form school-edit-form">' +
+        '<input type="text" class="task-edit__text" value="' + escapeHtml(t.text) + '" maxlength="140" aria-label="Texto de la tarea" />' +
+        '<input type="text" class="task-edit__child" value="' + escapeHtml(t.child || "") + '" maxlength="40" placeholder="¿Quién?" aria-label="Hijo/a" />' +
+        '<input type="date" class="task-edit__date" value="' + escapeHtml(t.dueDate || "") + '" aria-label="Fecha límite" />' +
+        '<button type="submit" class="task-edit__save" aria-label="Guardar" title="Guardar">&#10003;</button>' +
+        '<button type="button" class="task-edit__cancel" aria-label="Cancelar" title="Cancelar">&times;</button>' +
+        '</form></li>';
+}
