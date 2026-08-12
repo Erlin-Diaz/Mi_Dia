@@ -690,14 +690,50 @@ body {
             color: var(--ink-soft);
         }
 
-        /* Sub-encabezado de cada grupo (hijo/a) dentro de "Tareas del cole". */
+        /* Cada grupo (hijo/a) dentro de "Tareas del cole" es un <details>
+           propio: se puede desplegar/ocultar por separado, con la misma
+           idea de flecha que las secciones de arriba, pero más chica. */
+        .school-group {
+            margin-top: 14px;
+        }
+
         .school-group-label {
-            margin: 14px 0 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 6px;
             font-size: 0.68rem;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--ink-faint);
             font-weight: 600;
+            cursor: pointer;
+            list-style: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .school-group-label::-webkit-details-marker {
+            display: none;
+        }
+
+        .school-group-label::before {
+            content: "";
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 3px 0 3px 4px;
+            border-color: transparent transparent transparent var(--ink-faint);
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .school-group[open] .school-group-label::before {
+            transform: rotate(90deg);
+        }
+
+        .school-group-label:hover {
+            color: var(--accent);
         }
 
         .page__footer {

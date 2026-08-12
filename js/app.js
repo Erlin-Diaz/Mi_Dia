@@ -165,6 +165,31 @@ schoolSection.addEventListener("toggle", function () {
     try { localStorage.setItem(SCHOOL_OPEN_KEY, schoolSection.open ? "1" : "0"); } catch (e) { }
 });
 
+// ---- Cada hijo/a dentro de "Tareas del cole" también es desplegable
+// (independiente del resto), y recuerda si quedó abierto o cerrado.
+// Abierto por defecto: se guarda solo cuando alguien lo cierra.
+var SCHOOL_GROUPS_OPEN_KEY = "planner-schoolGroupsOpen";
+var schoolGroupsOpen = {};
+try {
+    var savedGroupsOpen = JSON.parse(localStorage.getItem(SCHOOL_GROUPS_OPEN_KEY) || "{}");
+    if (savedGroupsOpen && typeof savedGroupsOpen === "object") schoolGroupsOpen = savedGroupsOpen;
+} catch (e) { }
+function saveSchoolGroupsOpen() {
+    try { localStorage.setItem(SCHOOL_GROUPS_OPEN_KEY, JSON.stringify(schoolGroupsOpen)); } catch (e) { }
+}
+function schoolGroupKey(child) {
+    return (child || "").trim().toLowerCase() || " sin-asignar";
+}
+// El evento "toggle" de <details> no burbujea en todos los navegadores,
+// así que se escucha en fase de captura para que la delegación funcione
+// igual (el recorrido "hacia abajo" sí pasa por #schoolGroups).
+schoolGroups.addEventListener("toggle", function (e) {
+    var details = e.target.closest(".school-group");
+    if (!details) return;
+    schoolGroupsOpen[details.getAttribute("data-child-key")] = details.open;
+    saveSchoolGroupsOpen();
+}, true);
+
 // ---- Estado de sincronización (dot + texto + aviso de error) ----
 function setSyncStatus(cls, label) {
     syncDot.className = "sync-dot" + (cls ? " " + cls : "");
@@ -295,8 +320,13 @@ function paintSchool() {
         total += g.pending.length + g.done.length;
         pendingTotal += g.pending.length;
         var label = escapeHtml(g.child || "Sin asignar");
-        return '<h3 class="school-group-label">' + label + '</h3>' +
-            '<ul class="task-list">' + g.pending.map(renderTask).join("") + g.done.map(renderTask).join("") + '</ul>';
+        var countLabel = g.pending.length ? " (" + g.pending.length + ")" : "";
+        var key = schoolGroupKey(g.child);
+        var isOpen = schoolGroupsOpen[key] !== false; // por defecto abierto
+        return '<details class="school-group"' + (isOpen ? " open" : "") + ' data-child-key="' + escapeHtml(key) + '">' +
+            '<summary class="school-group-label">' + label + countLabel + '</summary>' +
+            '<ul class="task-list">' + g.pending.map(renderTask).join("") + g.done.map(renderTask).join("") + '</ul>' +
+            '</details>';
     }).join("");
 
     schoolCount.textContent = pendingTotal ? "(" + pendingTotal + ")" : "";
