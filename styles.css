@@ -789,4 +789,19 @@ body {
                 width: 54px;
                 height: 54px;
             }
+
+            /* En pantallas angostas, los 4 botones de acción (destacar,
+               mover, editar, borrar) en fila le quitaban demasiado ancho
+               al texto de la tarea. Acá se apilan en columna, en las tres
+               listas (hoy, Algún día, Tareas del cole), para dejarle más
+               lugar al texto. */
+            .task {
+                align-items: flex-start;
+            }
+
+            .task__actions {
+                flex-direction: column;
+                margin-right: 0;
+                margin-top: -4px;
+            }
         }
