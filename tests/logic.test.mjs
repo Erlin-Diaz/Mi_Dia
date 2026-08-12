@@ -26,6 +26,8 @@ import {
     groupSchoolTasksByChild,
     schoolTaskHtml,
     schoolTaskEditHtml,
+    SCHOOL_CHILDREN,
+    schoolChildOptionsHtml,
 } from "../js/logic.mjs";
 
 describe("escapeHtml", function () {
@@ -311,5 +313,43 @@ describe("schoolTaskEditHtml", function () {
         assert.ok(html.includes("task-edit__date"));
         assert.ok(html.includes("Adriana"));
         assert.ok(html.includes("2026-08-14"));
+    });
+
+    test("el campo hijo/a es un <select>, no texto libre", function () {
+        var html = schoolTaskEditHtml({ id: "1", text: "Tarea", child: "Adriana", dueDate: "" });
+        assert.ok(html.includes('<select class="task-edit__child"'));
+    });
+});
+
+describe("schoolChildOptionsHtml", function () {
+    test("incluye los tres hijos/as", function () {
+        var html = schoolChildOptionsHtml("");
+        SCHOOL_CHILDREN.forEach(function (name) {
+            assert.ok(html.includes(">" + name + "<"));
+        });
+    });
+
+    test("marca como seleccionado el hijo/a indicado", function () {
+        var html = schoolChildOptionsHtml("Danna");
+        assert.ok(html.includes('value="Danna" selected'));
+    });
+
+    test("la selección no distingue mayúsculas/espacios", function () {
+        var html = schoolChildOptionsHtml("  adriana  ");
+        assert.ok(html.includes('value="Adriana" selected'));
+    });
+
+    test("sin selección, ninguna opción queda marcada", function () {
+        var html = schoolChildOptionsHtml("");
+        assert.ok(!html.includes("selected"));
+    });
+
+    test("un valor guardado que no coincide se agrega como opción extra", function () {
+        var html = schoolChildOptionsHtml("Otro Nombre");
+        assert.ok(html.includes('value="Otro Nombre" selected'));
+        // Sigue mostrando los tres nombres fijos, sin marcar ninguno.
+        SCHOOL_CHILDREN.forEach(function (name) {
+            assert.ok(html.includes(">" + name + "<"));
+        });
     });
 });

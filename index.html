@@ -86,8 +86,12 @@
             <form class="add-row school-add-row" id="schoolAddForm">
                 <input type="text" id="schoolInput" placeholder="¿Qué hay que hacer?…" autocomplete="off"
                     maxlength="1000" />
-                <input type="text" id="schoolChildInput" placeholder="¿Quién? (opcional)" autocomplete="off"
-                    maxlength="40" />
+                <select id="schoolChildInput" aria-label="¿Quién? (opcional)">
+                    <option value="">¿Quién? (opcional)</option>
+                    <option value="Andy">Andy</option>
+                    <option value="Adriana">Adriana</option>
+                    <option value="Danna">Danna</option>
+                </select>
                 <input type="date" id="schoolDateInput" aria-label="Fecha límite (opcional)" />
                 <button type="submit">Añadir</button>
             </form>

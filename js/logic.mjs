@@ -275,15 +275,45 @@ export function schoolTaskHtml(t, overdue, opts) {
 }
 
 /**
+ * Nombres de los hijos/as, para el desplegable de "¿Quién?" en vez de
+ * texto libre. Lista fija: son solo tres.
+ */
+export const SCHOOL_CHILDREN = ["Andy", "Adriana", "Danna"];
+
+/**
+ * Genera las <option> del desplegable "¿Quién?", marcando como
+ * seleccionada la que coincide con "selected" (comparación sin
+ * distinguir mayúsculas/espacios, para no perder la selección por una
+ * diferencia de grafía). Si el valor guardado no coincide con ninguno
+ * de los tres nombres (por ejemplo, una tarea vieja con otro texto),
+ * se agrega como una cuarta opción extra para no perder ese dato al
+ * volver a guardar sin querer cambiarlo.
+ */
+export function schoolChildOptionsHtml(selected) {
+    var normalizedSelected = String(selected || "").trim().toLowerCase();
+    var matched = false;
+    var html = '<option value="">¿Quién?</option>';
+    SCHOOL_CHILDREN.forEach(function (name) {
+        var isSelected = normalizedSelected === name.toLowerCase();
+        if (isSelected) matched = true;
+        html += '<option value="' + escapeHtml(name) + '"' + (isSelected ? " selected" : "") + '>' + escapeHtml(name) + '</option>';
+    });
+    if (normalizedSelected && !matched) {
+        html += '<option value="' + escapeHtml(selected) + '" selected>' + escapeHtml(selected) + '</option>';
+    }
+    return html;
+}
+
+/**
  * HTML de una tarea del cole en modo edición: texto, hijo/a y fecha
- * límite editables en línea. Calco de taskEditHtml, con "quién" y fecha
- * en vez de hora.
+ * límite editables en línea. Calco de taskEditHtml, con "quién" (ahora
+ * un desplegable con los tres nombres) y fecha en vez de hora.
  */
 export function schoolTaskEditHtml(t) {
     return '<li class="task task--editing" data-id="' + escapeHtml(t.id) + '">' +
         '<form class="task-edit-form school-edit-form">' +
         '<input type="text" class="task-edit__text" value="' + escapeHtml(t.text) + '" maxlength="1000" aria-label="Texto de la tarea" />' +
-        '<input type="text" class="task-edit__child" value="' + escapeHtml(t.child || "") + '" maxlength="40" placeholder="¿Quién?" aria-label="Hijo/a" />' +
+        '<select class="task-edit__child" aria-label="Hijo/a">' + schoolChildOptionsHtml(t.child) + '</select>' +
         '<input type="date" class="task-edit__date" value="' + escapeHtml(t.dueDate || "") + '" aria-label="Fecha límite" />' +
         '<button type="submit" class="task-edit__save" aria-label="Guardar" title="Guardar">&#10003;</button>' +
         '<button type="button" class="task-edit__cancel" aria-label="Cancelar" title="Cancelar">&times;</button>' +

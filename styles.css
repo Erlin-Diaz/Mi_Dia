@@ -535,6 +535,7 @@ body {
     font-size: 0.85rem;
     padding: 4px 2px;
     outline: none;
+    cursor: pointer;
 }
 
 .task-edit__date {
@@ -676,12 +677,21 @@ body {
             min-width: 0;
         }
 
+        /* Ahora es un <select> (antes texto libre): no hereda el reset de
+           .add-row input[type="text"], así que se repite acá. */
         #schoolChildInput {
             flex: 1 1 120px;
             min-width: 0;
+            border: none;
+            background: transparent;
+            font-family: inherit;
             font-size: 0.85rem;
             color: var(--ink-soft);
+            padding: 6px 2px;
+            outline: none;
+            cursor: pointer;
         }
+
 
         #schoolDateInput {
             flex-shrink: 0;
@@ -803,5 +813,14 @@ body {
                 flex-direction: column;
                 margin-right: 0;
                 margin-top: -4px;
+            }
+
+            /* .task__box-wrap normalmente usa align-self: stretch para
+               dar un área de toque grande. Pero con la fila ahora más
+               alta (por los botones apilados), eso la centraba a media
+               altura, lejos del renglón de texto de arriba. Se ancla
+               arriba, junto con el texto. */
+            .task__box-wrap {
+                align-self: flex-start;
             }
         }
