@@ -388,7 +388,7 @@ taskList.addEventListener("submit", function (e) {
     editingTaskId = null;
     if (!task) { render(); return; }
     var newText = form.querySelector(".task-edit__text").value.trim();
-    if (newText) task.text = newText.slice(0, 140);
+    if (newText) task.text = newText.slice(0, 1000);
     task.time = form.querySelector(".task-edit__time").value || "";
     commit();
 });
@@ -464,7 +464,7 @@ somedayTaskList.addEventListener("submit", function (e) {
     editingSomedayId = null;
     if (!task) { renderSomeday(); return; }
     var newText = form.querySelector(".task-edit__text").value.trim();
-    if (newText) task.text = newText.slice(0, 140);
+    if (newText) task.text = newText.slice(0, 1000);
     commitSomeday();
 });
 
@@ -535,7 +535,7 @@ schoolGroups.addEventListener("submit", function (e) {
     editingSchoolId = null;
     if (!task) { renderSchool(); return; }
     var newText = form.querySelector(".task-edit__text").value.trim();
-    if (newText) task.text = newText.slice(0, 140);
+    if (newText) task.text = newText.slice(0, 1000);
     task.child = form.querySelector(".task-edit__child").value.trim();
     task.dueDate = form.querySelector(".task-edit__date").value || "";
     commitSchool();
@@ -612,7 +612,7 @@ function mergeTasksInto(targetTasks, incomingTasks, extraFields) {
         if (t.id && existingIds[t.id]) return;
         var task = {
             id: t.id || (Date.now() + "-" + Math.random().toString(36).slice(2, 7)),
-            text: t.text.slice(0, 140), time: typeof t.time === "string" ? t.time.slice(0, 12) : "",
+            text: t.text.slice(0, 1000), time: typeof t.time === "string" ? t.time.slice(0, 12) : "",
             done: !!t.done, priority: !!t.priority, order: offset + added
         };
         (extraFields || []).forEach(function (field) {
