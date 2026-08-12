@@ -158,7 +158,7 @@ export function taskEditHtml(t, opts) {
     var showTime = opts.showTime !== false;
     return '<li class="task task--editing" data-id="' + escapeHtml(t.id) + '">' +
         '<form class="task-edit-form">' +
-        '<input type="text" class="task-edit__text" value="' + escapeHtml(t.text) + '" maxlength="140" aria-label="Texto de la tarea" />' +
+        '<input type="text" class="task-edit__text" value="' + escapeHtml(t.text) + '" maxlength="1000" aria-label="Texto de la tarea" />' +
         (showTime ? '<input type="time" class="task-edit__time" value="' + escapeHtml(t.time || "") + '" aria-label="Hora de la tarea" />' : "") +
         '<button type="submit" class="task-edit__save" aria-label="Guardar" title="Guardar">&#10003;</button>' +
         '<button type="button" class="task-edit__cancel" aria-label="Cancelar" title="Cancelar">&times;</button>' +
@@ -282,7 +282,7 @@ export function schoolTaskHtml(t, overdue, opts) {
 export function schoolTaskEditHtml(t) {
     return '<li class="task task--editing" data-id="' + escapeHtml(t.id) + '">' +
         '<form class="task-edit-form school-edit-form">' +
-        '<input type="text" class="task-edit__text" value="' + escapeHtml(t.text) + '" maxlength="140" aria-label="Texto de la tarea" />' +
+        '<input type="text" class="task-edit__text" value="' + escapeHtml(t.text) + '" maxlength="1000" aria-label="Texto de la tarea" />' +
         '<input type="text" class="task-edit__child" value="' + escapeHtml(t.child || "") + '" maxlength="40" placeholder="¿Quién?" aria-label="Hijo/a" />' +
         '<input type="date" class="task-edit__date" value="' + escapeHtml(t.dueDate || "") + '" aria-label="Fecha límite" />' +
         '<button type="submit" class="task-edit__save" aria-label="Guardar" title="Guardar">&#10003;</button>' +
